@@ -18,7 +18,7 @@
   "button.pvp-overlay.done": "Fertig",
   "button.pvp-overlay.reset": "Zurücksetzen",
 
-  "slider.pvp-overlay.opacity": "Deckkraft: %s%%",
+  "slider.pvp-overlay.opacity": "Menü-Deckkraft: %s%%",
 
   "state.pvp-overlay.on": "AN",
   "state.pvp-overlay.off": "AUS"

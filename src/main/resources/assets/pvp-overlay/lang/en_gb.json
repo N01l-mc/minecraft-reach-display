@@ -18,7 +18,7 @@
   "button.pvp-overlay.done": "Done",
   "button.pvp-overlay.reset": "Reset",
 
-  "slider.pvp-overlay.opacity": "Opacity: %s%%",
+  "slider.pvp-overlay.opacity": "Menu Opacity: %s%%",
 
   "state.pvp-overlay.on": "ON",
   "state.pvp-overlay.off": "OFF"
