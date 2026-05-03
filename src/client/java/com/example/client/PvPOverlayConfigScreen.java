@@ -6,8 +6,15 @@ import net.minecraft.client.gui.components.Button;
 import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.client.input.KeyEvent;
 import net.minecraft.network.chat.Component;
+import net.minecraft.network.chat.MutableComponent;
+import net.minecraft.network.chat.Style;
+import net.minecraft.network.chat.TextColor;
 
 public class PvPOverlayConfigScreen extends Screen {
+    private static final TextColor GREEN = TextColor.fromRgb(0x55FF55);
+    private static final TextColor RED = TextColor.fromRgb(0xFF5555);
+    private static final TextColor WHITE = TextColor.fromRgb(0xFFFFFF);
+
     public PvPOverlayConfigScreen() {
         super(Component.literal("PvP Overlay Config"));
     }
@@ -78,18 +85,24 @@ public class PvPOverlayConfigScreen extends Screen {
     }
 
     private Component overlayButtonText() {
-        return Component.literal("Overlay: " + onOff(TestModClient.isOverlayEnabled()));
+        return settingText("Overlay: ", TestModClient.isOverlayEnabled());
     }
 
     private Component hitButtonText() {
-        return Component.literal("Show Hit: " + onOff(TestModClient.isShowHit()));
+        return settingText("Show Hit: ", TestModClient.isShowHit());
     }
 
     private Component takenButtonText() {
-        return Component.literal("Show Taken: " + onOff(TestModClient.isShowTaken()));
+        return settingText("Show Taken: ", TestModClient.isShowTaken());
     }
 
-    private String onOff(boolean value) {
-        return value ? "ON" : "OFF";
+    private Component settingText(String label, boolean value) {
+        MutableComponent component = Component.literal(label)
+                .withStyle(Style.EMPTY.withColor(WHITE));
+
+        MutableComponent state = Component.literal(value ? "ON" : "OFF")
+                .withStyle(Style.EMPTY.withColor(value ? GREEN : RED));
+
+        return component.append(state);
     }
 }

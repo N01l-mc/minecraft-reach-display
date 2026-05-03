@@ -60,7 +60,8 @@ public class TestModClient implements ClientModInitializer {
 
 			int paddingX = 8;
 			int paddingY = 8;
-			int lineHeight = 12;
+			int lineGap = 3;
+			int fontHeight = minecraft.font.lineHeight;
 
 			int visibleLines = 0;
 			int textWidth = 0;
@@ -79,8 +80,9 @@ public class TestModClient implements ClientModInitializer {
 				return;
 			}
 
+			int contentHeight = visibleLines * fontHeight + Math.max(0, visibleLines - 1) * lineGap;
 			int boxWidth = textWidth + paddingX * 2;
-			int boxHeight = paddingY * 2 + visibleLines * lineHeight;
+			int boxHeight = contentHeight + paddingY * 2;
 
 			int screenWidth = minecraft.getWindow().getGuiScaledWidth();
 
@@ -91,7 +93,7 @@ public class TestModClient implements ClientModInitializer {
 			graphics.renderOutline(x, y, boxWidth, boxHeight, 0xFFFFFFFF);
 
 			int textX = x + paddingX;
-			int textY = y + paddingY;
+			int textY = y + (boxHeight - contentHeight) / 2;
 
 			if (CONFIG.showHit) {
 				drawDistanceLine(
@@ -105,7 +107,7 @@ public class TestModClient implements ClientModInitializer {
 						suffix
 				);
 
-				textY += lineHeight;
+				textY += fontHeight + lineGap;
 			}
 
 			if (CONFIG.showTaken) {
