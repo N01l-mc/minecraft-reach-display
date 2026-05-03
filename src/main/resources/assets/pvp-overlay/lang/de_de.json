@@ -1,0 +1,25 @@
+{
+  "key.pvp-overlay.open_config": "PvP-Overlay-Konfiguration öffnen",
+
+  "overlay.pvp-overlay.title": "PvP-Overlay",
+  "overlay.pvp-overlay.hit": "Treffer",
+  "overlay.pvp-overlay.taken": "Erhalten",
+  "overlay.pvp-overlay.blocks": "Blöcke",
+
+  "screen.pvp-overlay.config.title": "PvP-Overlay-Konfiguration",
+  "screen.pvp-overlay.position.title": "PvP-Overlay verschieben",
+  "screen.pvp-overlay.position.instructions": "Ziehe die Overlay-Box mit der linken Maustaste.",
+
+  "button.pvp-overlay.overlay": "Overlay",
+  "button.pvp-overlay.show_hit": "Treffer anzeigen",
+  "button.pvp-overlay.show_taken": "Erhalten anzeigen",
+  "button.pvp-overlay.change_position": "Position ändern",
+  "button.pvp-overlay.reset_position": "Position zurücksetzen",
+  "button.pvp-overlay.done": "Fertig",
+  "button.pvp-overlay.reset": "Zurücksetzen",
+
+  "slider.pvp-overlay.opacity": "Deckkraft: %s%%",
+
+  "state.pvp-overlay.on": "AN",
+  "state.pvp-overlay.off": "AUS"
+}

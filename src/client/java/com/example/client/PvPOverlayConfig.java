@@ -26,7 +26,6 @@ public class PvPOverlayConfig {
     public int overlayX = 0;
     public int overlayY = 10;
 
-    // 0 = komplett durchsichtig, 100 = komplett dunkel/schwarz
     public int configMenuOpacityPercent = 25;
 
     public static PvPOverlayConfig load() {

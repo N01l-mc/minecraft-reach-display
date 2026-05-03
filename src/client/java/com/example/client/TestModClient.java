@@ -8,6 +8,7 @@ import net.minecraft.client.KeyMapping;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.client.input.KeyEvent;
+import net.minecraft.network.chat.Component;
 import net.minecraft.world.damagesource.DamageSource;
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.player.Player;
@@ -146,6 +147,10 @@ public class TestModClient implements ClientModInitializer {
 		return (alpha << 24);
 	}
 
+	public static void drawConfigMenuBackdrop(GuiGraphics graphics, int width, int height) {
+		graphics.fill(0, 0, width, height, getConfigMenuBackgroundColor());
+	}
+
 	public static void setOverlayPosition(int x, int y) {
 		Minecraft minecraft = Minecraft.getInstance();
 
@@ -203,7 +208,7 @@ public class TestModClient implements ClientModInitializer {
 		}
 
 		if (textWidth == 0) {
-			textWidth = minecraft.font.width("PvP Overlay");
+			textWidth = minecraft.font.width(Component.translatable("overlay.pvp-overlay.title").getString());
 		}
 
 		return textWidth + paddingX * 2;
@@ -226,9 +231,9 @@ public class TestModClient implements ClientModInitializer {
 	}
 
 	public static void drawOverlay(GuiGraphics graphics, Minecraft minecraft) {
-		String hitPrefix = "Hit: ";
-		String takenPrefix = "Taken: ";
-		String suffix = " blocks";
+		String hitPrefix = Component.translatable("overlay.pvp-overlay.hit").getString() + ": ";
+		String takenPrefix = Component.translatable("overlay.pvp-overlay.taken").getString() + ": ";
+		String suffix = " " + Component.translatable("overlay.pvp-overlay.blocks").getString();
 
 		int paddingX = 8;
 		int paddingY = 8;
@@ -298,11 +303,21 @@ public class TestModClient implements ClientModInitializer {
 	}
 
 	private static String hitFullText() {
-		return "Hit: " + hitMainText + hitRoundedDigit + " blocks";
+		return Component.translatable("overlay.pvp-overlay.hit").getString()
+				+ ": "
+				+ hitMainText
+				+ hitRoundedDigit
+				+ " "
+				+ Component.translatable("overlay.pvp-overlay.blocks").getString();
 	}
 
 	private static String takenFullText() {
-		return "Taken: " + takenMainText + takenRoundedDigit + " blocks";
+		return Component.translatable("overlay.pvp-overlay.taken").getString()
+				+ ": "
+				+ takenMainText
+				+ takenRoundedDigit
+				+ " "
+				+ Component.translatable("overlay.pvp-overlay.blocks").getString();
 	}
 
 	private static void setHitDistance(double distance) {

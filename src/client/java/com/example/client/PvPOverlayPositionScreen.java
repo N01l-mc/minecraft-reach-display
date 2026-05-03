@@ -18,7 +18,7 @@ public class PvPOverlayPositionScreen extends Screen {
     private int dragOffsetY = 0;
 
     public PvPOverlayPositionScreen(Screen parent) {
-        super(Component.literal("Move PvP Overlay"));
+        super(Component.translatable("screen.pvp-overlay.position.title"));
         this.parent = parent;
     }
 
@@ -27,12 +27,12 @@ public class PvPOverlayPositionScreen extends Screen {
         int centerX = this.width / 2;
 
         Button resetButton = Button.builder(
-                Component.literal("Reset Position"),
+                Component.translatable("button.pvp-overlay.reset_position"),
                 button -> TestModClient.resetOverlayPosition()
         ).bounds(centerX - 100, this.height - 56, 200, 20).build();
 
         Button doneButton = Button.builder(
-                Component.literal("Done"),
+                Component.translatable("button.pvp-overlay.done"),
                 button -> Minecraft.getInstance().setScreen(parent)
         ).bounds(centerX - 100, this.height - 28, 200, 20).build();
 
@@ -61,7 +61,7 @@ public class PvPOverlayPositionScreen extends Screen {
 
         handleDragging(minecraft, mouseX, mouseY);
 
-        graphics.fill(0, 0, this.width, this.height, TestModClient.getConfigMenuBackgroundColor());
+        TestModClient.drawConfigMenuBackdrop(graphics, this.width, this.height);
 
         graphics.drawCenteredString(
                 this.font,
@@ -73,7 +73,7 @@ public class PvPOverlayPositionScreen extends Screen {
 
         graphics.drawCenteredString(
                 this.font,
-                "Drag the overlay box with left mouse button.",
+                Component.translatable("screen.pvp-overlay.position.instructions"),
                 this.width / 2,
                 38,
                 0xFFAAAAAA

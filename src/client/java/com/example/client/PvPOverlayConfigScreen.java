@@ -19,7 +19,7 @@ public class PvPOverlayConfigScreen extends Screen {
     private static final int DEFAULT_MENU_OPACITY = 25;
 
     public PvPOverlayConfigScreen() {
-        super(Component.literal("PvP Overlay Config"));
+        super(Component.translatable("screen.pvp-overlay.config.title"));
     }
 
     @Override
@@ -59,7 +59,7 @@ public class PvPOverlayConfigScreen extends Screen {
         );
 
         Button resetOpacityButton = Button.builder(
-                Component.literal("Reset"),
+                Component.translatable("button.pvp-overlay.reset"),
                 button -> {
                     TestModClient.setConfigMenuOpacityPercent(DEFAULT_MENU_OPACITY);
                     this.rebuildWidgets();
@@ -67,12 +67,12 @@ public class PvPOverlayConfigScreen extends Screen {
         ).bounds(centerX + 48, startY + 92, 52, 20).build();
 
         Button changePositionButton = Button.builder(
-                Component.literal("Change Position"),
+                Component.translatable("button.pvp-overlay.change_position"),
                 button -> Minecraft.getInstance().setScreen(new PvPOverlayPositionScreen(this))
         ).bounds(centerX - 100, startY + 128, 200, 20).build();
 
         Button doneButton = Button.builder(
-                Component.literal("Done"),
+                Component.translatable("button.pvp-overlay.done"),
                 button -> Minecraft.getInstance().setScreen(null)
         ).bounds(centerX - 100, startY + 164, 200, 20).build();
 
@@ -97,7 +97,7 @@ public class PvPOverlayConfigScreen extends Screen {
 
     @Override
     public void render(GuiGraphics graphics, int mouseX, int mouseY, float delta) {
-        graphics.fill(0, 0, this.width, this.height, TestModClient.getConfigMenuBackgroundColor());
+        TestModClient.drawConfigMenuBackdrop(graphics, this.width, this.height);
 
         graphics.drawCenteredString(
                 this.font,
@@ -111,22 +111,23 @@ public class PvPOverlayConfigScreen extends Screen {
     }
 
     private Component overlayButtonText() {
-        return settingText("Overlay: ", TestModClient.isOverlayEnabled());
+        return settingText("button.pvp-overlay.overlay", TestModClient.isOverlayEnabled());
     }
 
     private Component hitButtonText() {
-        return settingText("Show Hit: ", TestModClient.isShowHit());
+        return settingText("button.pvp-overlay.show_hit", TestModClient.isShowHit());
     }
 
     private Component takenButtonText() {
-        return settingText("Show Taken: ", TestModClient.isShowTaken());
+        return settingText("button.pvp-overlay.show_taken", TestModClient.isShowTaken());
     }
 
-    private Component settingText(String label, boolean value) {
-        MutableComponent component = Component.literal(label)
+    private Component settingText(String labelKey, boolean value) {
+        MutableComponent component = Component.translatable(labelKey)
+                .append(": ")
                 .withStyle(Style.EMPTY.withColor(WHITE));
 
-        MutableComponent state = Component.literal(value ? "ON" : "OFF")
+        MutableComponent state = Component.translatable(value ? "state.pvp-overlay.on" : "state.pvp-overlay.off")
                 .withStyle(Style.EMPTY.withColor(value ? GREEN : RED));
 
         return component.append(state);
@@ -157,7 +158,7 @@ public class PvPOverlayConfigScreen extends Screen {
         }
 
         private static Component opacityText(int percent) {
-            return Component.literal("Opacity: " + percent + "%");
+            return Component.translatable("slider.pvp-overlay.opacity", percent);
         }
     }
 }
