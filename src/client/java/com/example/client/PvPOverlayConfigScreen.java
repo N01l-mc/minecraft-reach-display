@@ -2,6 +2,7 @@ package com.example.client;
 
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.GuiGraphics;
+import net.minecraft.client.gui.components.AbstractSliderButton;
 import net.minecraft.client.gui.components.Button;
 import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.client.input.KeyEvent;
@@ -15,6 +16,8 @@ public class PvPOverlayConfigScreen extends Screen {
     private static final TextColor RED = TextColor.fromRgb(0xFF5555);
     private static final TextColor WHITE = TextColor.fromRgb(0xFFFFFF);
 
+    private static final int DEFAULT_MENU_OPACITY = 25;
+
     public PvPOverlayConfigScreen() {
         super(Component.literal("PvP Overlay Config"));
     }
@@ -22,7 +25,7 @@ public class PvPOverlayConfigScreen extends Screen {
     @Override
     protected void init() {
         int centerX = this.width / 2;
-        int startY = this.height / 4;
+        int startY = this.height / 4 - 12;
 
         Button overlayButton = Button.builder(
                 overlayButtonText(),
@@ -48,14 +51,37 @@ public class PvPOverlayConfigScreen extends Screen {
                 }
         ).bounds(centerX - 100, startY + 56, 200, 20).build();
 
+        ConfigOpacitySlider opacitySlider = new ConfigOpacitySlider(
+                centerX - 100,
+                startY + 92,
+                144,
+                20
+        );
+
+        Button resetOpacityButton = Button.builder(
+                Component.literal("Reset"),
+                button -> {
+                    TestModClient.setConfigMenuOpacityPercent(DEFAULT_MENU_OPACITY);
+                    this.rebuildWidgets();
+                }
+        ).bounds(centerX + 48, startY + 92, 52, 20).build();
+
+        Button changePositionButton = Button.builder(
+                Component.literal("Change Position"),
+                button -> Minecraft.getInstance().setScreen(new PvPOverlayPositionScreen(this))
+        ).bounds(centerX - 100, startY + 128, 200, 20).build();
+
         Button doneButton = Button.builder(
                 Component.literal("Done"),
                 button -> Minecraft.getInstance().setScreen(null)
-        ).bounds(centerX - 100, startY + 96, 200, 20).build();
+        ).bounds(centerX - 100, startY + 164, 200, 20).build();
 
         this.addRenderableWidget(overlayButton);
         this.addRenderableWidget(hitButton);
         this.addRenderableWidget(takenButton);
+        this.addRenderableWidget(opacitySlider);
+        this.addRenderableWidget(resetOpacityButton);
+        this.addRenderableWidget(changePositionButton);
         this.addRenderableWidget(doneButton);
     }
 
@@ -71,13 +97,13 @@ public class PvPOverlayConfigScreen extends Screen {
 
     @Override
     public void render(GuiGraphics graphics, int mouseX, int mouseY, float delta) {
-        graphics.fill(0, 0, this.width, this.height, 0x88000000);
+        graphics.fill(0, 0, this.width, this.height, TestModClient.getConfigMenuBackgroundColor());
 
         graphics.drawCenteredString(
                 this.font,
                 this.title,
                 this.width / 2,
-                40,
+                30,
                 0xFFFFFFFF
         );
 
@@ -104,5 +130,34 @@ public class PvPOverlayConfigScreen extends Screen {
                 .withStyle(Style.EMPTY.withColor(value ? GREEN : RED));
 
         return component.append(state);
+    }
+
+    private static class ConfigOpacitySlider extends AbstractSliderButton {
+        public ConfigOpacitySlider(int x, int y, int width, int height) {
+            super(
+                    x,
+                    y,
+                    width,
+                    height,
+                    opacityText(TestModClient.getConfigMenuOpacityPercent()),
+                    TestModClient.getConfigMenuOpacityPercent() / 100.0
+            );
+        }
+
+        @Override
+        protected void updateMessage() {
+            int percent = (int) Math.round(this.value * 100.0);
+            this.setMessage(opacityText(percent));
+        }
+
+        @Override
+        protected void applyValue() {
+            int percent = (int) Math.round(this.value * 100.0);
+            TestModClient.setConfigMenuOpacityPercent(percent);
+        }
+
+        private static Component opacityText(int percent) {
+            return Component.literal("Opacity: " + percent + "%");
+        }
     }
 }

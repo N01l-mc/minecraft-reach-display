@@ -6,6 +6,7 @@ import net.fabricmc.fabric.api.client.keybinding.v1.KeyBindingHelper;
 import net.fabricmc.fabric.api.client.rendering.v1.HudRenderCallback;
 import net.minecraft.client.KeyMapping;
 import net.minecraft.client.Minecraft;
+import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.client.input.KeyEvent;
 import net.minecraft.world.damagesource.DamageSource;
 import net.minecraft.world.entity.Entity;
@@ -50,78 +51,7 @@ public class TestModClient implements ClientModInitializer {
 			}
 
 			Minecraft minecraft = Minecraft.getInstance();
-
-			String hitPrefix = "Hit: ";
-			String takenPrefix = "Taken: ";
-			String suffix = " blocks";
-
-			String hitFullText = hitPrefix + hitMainText + hitRoundedDigit + suffix;
-			String takenFullText = takenPrefix + takenMainText + takenRoundedDigit + suffix;
-
-			int paddingX = 8;
-			int paddingY = 8;
-			int lineGap = 3;
-			int fontHeight = minecraft.font.lineHeight;
-
-			int visibleLines = 0;
-			int textWidth = 0;
-
-			if (CONFIG.showHit) {
-				visibleLines++;
-				textWidth = Math.max(textWidth, minecraft.font.width(hitFullText));
-			}
-
-			if (CONFIG.showTaken) {
-				visibleLines++;
-				textWidth = Math.max(textWidth, minecraft.font.width(takenFullText));
-			}
-
-			if (visibleLines == 0) {
-				return;
-			}
-
-			int contentHeight = visibleLines * fontHeight + Math.max(0, visibleLines - 1) * lineGap;
-			int boxWidth = textWidth + paddingX * 2;
-			int boxHeight = contentHeight + paddingY * 2;
-
-			int screenWidth = minecraft.getWindow().getGuiScaledWidth();
-
-			int x = (screenWidth - boxWidth) / 2;
-			int y = 10;
-
-			graphics.fill(x, y, x + boxWidth, y + boxHeight, 0xAA000000);
-			graphics.renderOutline(x, y, boxWidth, boxHeight, 0xFFFFFFFF);
-
-			int textX = x + paddingX;
-			int textY = y + (boxHeight - contentHeight) / 2;
-
-			if (CONFIG.showHit) {
-				drawDistanceLine(
-						graphics,
-						minecraft,
-						textX,
-						textY,
-						hitPrefix,
-						hitMainText,
-						hitRoundedDigit,
-						suffix
-				);
-
-				textY += fontHeight + lineGap;
-			}
-
-			if (CONFIG.showTaken) {
-				drawDistanceLine(
-						graphics,
-						minecraft,
-						textX,
-						textY,
-						takenPrefix,
-						takenMainText,
-						takenRoundedDigit,
-						suffix
-				);
-			}
+			drawOverlay(graphics, minecraft);
 		});
 	}
 
@@ -202,6 +132,179 @@ public class TestModClient implements ClientModInitializer {
 		CONFIG.save();
 	}
 
+	public static int getConfigMenuOpacityPercent() {
+		return CONFIG.configMenuOpacityPercent;
+	}
+
+	public static void setConfigMenuOpacityPercent(int percent) {
+		CONFIG.configMenuOpacityPercent = clampInt(percent, 0, 100);
+		CONFIG.save();
+	}
+
+	public static int getConfigMenuBackgroundColor() {
+		int alpha = Math.round(CONFIG.configMenuOpacityPercent * 255.0f / 100.0f);
+		return (alpha << 24);
+	}
+
+	public static void setOverlayPosition(int x, int y) {
+		Minecraft minecraft = Minecraft.getInstance();
+
+		int boxWidth = getOverlayBoxWidth(minecraft);
+		int boxHeight = getOverlayBoxHeight(minecraft);
+
+		int screenWidth = minecraft.getWindow().getGuiScaledWidth();
+		int screenHeight = minecraft.getWindow().getGuiScaledHeight();
+
+		CONFIG.customPosition = true;
+		CONFIG.overlayX = clampInt(x, 0, Math.max(0, screenWidth - boxWidth));
+		CONFIG.overlayY = clampInt(y, 0, Math.max(0, screenHeight - boxHeight));
+		CONFIG.save();
+	}
+
+	public static void resetOverlayPosition() {
+		CONFIG.customPosition = false;
+		CONFIG.overlayX = 0;
+		CONFIG.overlayY = 10;
+		CONFIG.save();
+	}
+
+	public static int getOverlayX(Minecraft minecraft) {
+		int boxWidth = getOverlayBoxWidth(minecraft);
+		int screenWidth = minecraft.getWindow().getGuiScaledWidth();
+
+		if (CONFIG.customPosition) {
+			return clampInt(CONFIG.overlayX, 0, Math.max(0, screenWidth - boxWidth));
+		}
+
+		return (screenWidth - boxWidth) / 2;
+	}
+
+	public static int getOverlayY(Minecraft minecraft) {
+		int boxHeight = getOverlayBoxHeight(minecraft);
+		int screenHeight = minecraft.getWindow().getGuiScaledHeight();
+
+		if (CONFIG.customPosition) {
+			return clampInt(CONFIG.overlayY, 0, Math.max(0, screenHeight - boxHeight));
+		}
+
+		return 10;
+	}
+
+	public static int getOverlayBoxWidth(Minecraft minecraft) {
+		int paddingX = 8;
+		int textWidth = 0;
+
+		if (CONFIG.showHit) {
+			textWidth = Math.max(textWidth, minecraft.font.width(hitFullText()));
+		}
+
+		if (CONFIG.showTaken) {
+			textWidth = Math.max(textWidth, minecraft.font.width(takenFullText()));
+		}
+
+		if (textWidth == 0) {
+			textWidth = minecraft.font.width("PvP Overlay");
+		}
+
+		return textWidth + paddingX * 2;
+	}
+
+	public static int getOverlayBoxHeight(Minecraft minecraft) {
+		int paddingY = 8;
+		int lineGap = 3;
+		int fontHeight = minecraft.font.lineHeight;
+
+		int visibleLines = getVisibleLineCount();
+
+		if (visibleLines == 0) {
+			visibleLines = 1;
+		}
+
+		int contentHeight = visibleLines * fontHeight + Math.max(0, visibleLines - 1) * lineGap;
+
+		return contentHeight + paddingY * 2;
+	}
+
+	public static void drawOverlay(GuiGraphics graphics, Minecraft minecraft) {
+		String hitPrefix = "Hit: ";
+		String takenPrefix = "Taken: ";
+		String suffix = " blocks";
+
+		int paddingX = 8;
+		int paddingY = 8;
+		int lineGap = 3;
+		int fontHeight = minecraft.font.lineHeight;
+
+		int visibleLines = getVisibleLineCount();
+
+		if (visibleLines == 0) {
+			return;
+		}
+
+		int contentHeight = visibleLines * fontHeight + Math.max(0, visibleLines - 1) * lineGap;
+		int boxWidth = getOverlayBoxWidth(minecraft);
+		int boxHeight = contentHeight + paddingY * 2;
+
+		int x = getOverlayX(minecraft);
+		int y = getOverlayY(minecraft);
+
+		graphics.fill(x, y, x + boxWidth, y + boxHeight, 0xAA000000);
+		graphics.renderOutline(x, y, boxWidth, boxHeight, 0xFFFFFFFF);
+
+		int textX = x + paddingX;
+		int textY = y + (boxHeight - contentHeight) / 2;
+
+		if (CONFIG.showHit) {
+			drawDistanceLine(
+					graphics,
+					minecraft,
+					textX,
+					textY,
+					hitPrefix,
+					hitMainText,
+					hitRoundedDigit,
+					suffix
+			);
+
+			textY += fontHeight + lineGap;
+		}
+
+		if (CONFIG.showTaken) {
+			drawDistanceLine(
+					graphics,
+					minecraft,
+					textX,
+					textY,
+					takenPrefix,
+					takenMainText,
+					takenRoundedDigit,
+					suffix
+			);
+		}
+	}
+
+	private static int getVisibleLineCount() {
+		int visibleLines = 0;
+
+		if (CONFIG.showHit) {
+			visibleLines++;
+		}
+
+		if (CONFIG.showTaken) {
+			visibleLines++;
+		}
+
+		return visibleLines;
+	}
+
+	private static String hitFullText() {
+		return "Hit: " + hitMainText + hitRoundedDigit + " blocks";
+	}
+
+	private static String takenFullText() {
+		return "Taken: " + takenMainText + takenRoundedDigit + " blocks";
+	}
+
 	private static void setHitDistance(double distance) {
 		String[] parts = formatDistance(distance);
 		hitMainText = parts[0];
@@ -242,8 +345,12 @@ public class TestModClient implements ClientModInitializer {
 		return Math.max(min, Math.min(max, value));
 	}
 
+	private static int clampInt(int value, int min, int max) {
+		return Math.max(min, Math.min(max, value));
+	}
+
 	private static void drawDistanceLine(
-			net.minecraft.client.gui.GuiGraphics graphics,
+			GuiGraphics graphics,
 			Minecraft minecraft,
 			int x,
 			int y,

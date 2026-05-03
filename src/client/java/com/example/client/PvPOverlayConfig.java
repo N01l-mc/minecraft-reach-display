@@ -22,6 +22,13 @@ public class PvPOverlayConfig {
     public boolean showHit = true;
     public boolean showTaken = true;
 
+    public boolean customPosition = false;
+    public int overlayX = 0;
+    public int overlayY = 10;
+
+    // 0 = komplett durchsichtig, 100 = komplett dunkel/schwarz
+    public int configMenuOpacityPercent = 25;
+
     public static PvPOverlayConfig load() {
         if (!Files.exists(CONFIG_PATH)) {
             PvPOverlayConfig config = new PvPOverlayConfig();
@@ -36,6 +43,8 @@ public class PvPOverlayConfig {
             if (config == null) {
                 config = new PvPOverlayConfig();
             }
+
+            config.configMenuOpacityPercent = clampInt(config.configMenuOpacityPercent, 0, 100);
 
             return config;
         } catch (Exception exception) {
@@ -56,5 +65,9 @@ public class PvPOverlayConfig {
             System.err.println("[PvP Overlay] Failed to save config.");
             exception.printStackTrace();
         }
+    }
+
+    private static int clampInt(int value, int min, int max) {
+        return Math.max(min, Math.min(max, value));
     }
 }
