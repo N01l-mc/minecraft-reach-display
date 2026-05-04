@@ -28,6 +28,9 @@ public class PvPOverlayConfig {
 
     public int configMenuOpacityPercent = 25;
 
+    // 0 = off, 1 = force left, 2 = force right
+    public int forcedOtherPlayerMainHand = 0;
+
     public static PvPOverlayConfig load() {
         if (!Files.exists(CONFIG_PATH)) {
             PvPOverlayConfig config = new PvPOverlayConfig();
@@ -44,6 +47,7 @@ public class PvPOverlayConfig {
             }
 
             config.configMenuOpacityPercent = clampInt(config.configMenuOpacityPercent, 0, 100);
+            config.forcedOtherPlayerMainHand = clampInt(config.forcedOtherPlayerMainHand, 0, 2);
 
             return config;
         } catch (Exception exception) {

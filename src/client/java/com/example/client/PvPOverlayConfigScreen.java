@@ -25,7 +25,16 @@ public class PvPOverlayConfigScreen extends Screen {
     @Override
     protected void init() {
         int centerX = this.width / 2;
-        int startY = this.height / 4 - 12;
+
+        int buttonWidth = 200;
+        int sliderWidth = 144;
+        int resetWidth = 52;
+
+        int leftX = centerX - 205;
+        int rightX = centerX + 5;
+
+        int startY = 58;
+        int row = 28;
 
         Button overlayButton = Button.builder(
                 overlayButtonText(),
@@ -33,7 +42,7 @@ public class PvPOverlayConfigScreen extends Screen {
                     TestModClient.toggleOverlayEnabled();
                     button.setMessage(overlayButtonText());
                 }
-        ).bounds(centerX - 100, startY, 200, 20).build();
+        ).bounds(leftX, startY, buttonWidth, 20).build();
 
         Button hitButton = Button.builder(
                 hitButtonText(),
@@ -41,7 +50,7 @@ public class PvPOverlayConfigScreen extends Screen {
                     TestModClient.toggleShowHit();
                     button.setMessage(hitButtonText());
                 }
-        ).bounds(centerX - 100, startY + 28, 200, 20).build();
+        ).bounds(leftX, startY + row, buttonWidth, 20).build();
 
         Button takenButton = Button.builder(
                 takenButtonText(),
@@ -49,12 +58,33 @@ public class PvPOverlayConfigScreen extends Screen {
                     TestModClient.toggleShowTaken();
                     button.setMessage(takenButtonText());
                 }
-        ).bounds(centerX - 100, startY + 56, 200, 20).build();
+        ).bounds(leftX, startY + row * 2, buttonWidth, 20).build();
+
+        Button forceMainHandButton = Button.builder(
+                forceMainHandButtonText(),
+                button -> {
+                    TestModClient.cycleForcedOtherPlayerMainHand();
+                    button.setMessage(forceMainHandButtonText());
+                }
+        ).bounds(rightX, startY, buttonWidth, 20).build();
+
+        Button changePositionButton = Button.builder(
+                Component.translatable("button.pvp-overlay.change_position"),
+                button -> Minecraft.getInstance().setScreen(new PvPOverlayPositionScreen(this))
+        ).bounds(rightX, startY + row, buttonWidth, 20).build();
+
+        Button doneButton = Button.builder(
+                Component.translatable("button.pvp-overlay.done"),
+                button -> Minecraft.getInstance().setScreen(null)
+        ).bounds(rightX, startY + row * 2, buttonWidth, 20).build();
+
+        int sliderX = centerX - 100;
+        int sliderY = startY + row * 3 + 10;
 
         ConfigOpacitySlider opacitySlider = new ConfigOpacitySlider(
-                centerX - 100,
-                startY + 92,
-                144,
+                sliderX,
+                sliderY,
+                sliderWidth,
                 20
         );
 
@@ -64,25 +94,16 @@ public class PvPOverlayConfigScreen extends Screen {
                     TestModClient.setConfigMenuOpacityPercent(DEFAULT_MENU_OPACITY);
                     this.rebuildWidgets();
                 }
-        ).bounds(centerX + 48, startY + 92, 52, 20).build();
-
-        Button changePositionButton = Button.builder(
-                Component.translatable("button.pvp-overlay.change_position"),
-                button -> Minecraft.getInstance().setScreen(new PvPOverlayPositionScreen(this))
-        ).bounds(centerX - 100, startY + 128, 200, 20).build();
-
-        Button doneButton = Button.builder(
-                Component.translatable("button.pvp-overlay.done"),
-                button -> Minecraft.getInstance().setScreen(null)
-        ).bounds(centerX - 100, startY + 164, 200, 20).build();
+        ).bounds(sliderX + sliderWidth + 4, sliderY, resetWidth, 20).build();
 
         this.addRenderableWidget(overlayButton);
         this.addRenderableWidget(hitButton);
         this.addRenderableWidget(takenButton);
-        this.addRenderableWidget(opacitySlider);
-        this.addRenderableWidget(resetOpacityButton);
+        this.addRenderableWidget(forceMainHandButton);
         this.addRenderableWidget(changePositionButton);
         this.addRenderableWidget(doneButton);
+        this.addRenderableWidget(opacitySlider);
+        this.addRenderableWidget(resetOpacityButton);
     }
 
     @Override
@@ -103,7 +124,7 @@ public class PvPOverlayConfigScreen extends Screen {
                 this.font,
                 this.title,
                 this.width / 2,
-                30,
+                26,
                 0xFFFFFFFF
         );
 
@@ -120,6 +141,17 @@ public class PvPOverlayConfigScreen extends Screen {
 
     private Component takenButtonText() {
         return settingText("button.pvp-overlay.show_taken", TestModClient.isShowTaken());
+    }
+
+    private Component forceMainHandButtonText() {
+        MutableComponent component = Component.translatable("button.pvp-overlay.force_main_hand")
+                .append(": ")
+                .withStyle(Style.EMPTY.withColor(WHITE));
+
+        MutableComponent state = TestModClient.getForcedOtherPlayerMainHandText().copy()
+                .withStyle(Style.EMPTY.withColor(TestModClient.getForcedOtherPlayerMainHand() == 0 ? RED : GREEN));
+
+        return component.append(state);
     }
 
     private Component settingText(String labelKey, boolean value) {
