@@ -20,15 +20,15 @@
   "screen.pvp-overlay.color_picker.early": "Choose Early Color",
   "screen.pvp-overlay.color_picker.late": "Choose Late Color",
 
-  "label.pvp-overlay.jump_reset_perfect_color": "Perfect Color:",
-  "label.pvp-overlay.jump_reset_early_color": "Early Color:",
-  "label.pvp-overlay.jump_reset_late_color": "Late Color:",
+  "label.pvp-overlay.color_suffix": " Colour:",
   "label.pvp-overlay.color_picker.selected": "Selected:",
 
   "button.pvp-overlay.overlay": "Overlay",
   "button.pvp-overlay.show_hit": "Show Hit",
   "button.pvp-overlay.show_taken": "Show Taken",
   "button.pvp-overlay.show_jump_reset": "Show Jump Reset",
+  "button.pvp-overlay.jump_reset_require_sprint": "Require Sprint",
+  "button.pvp-overlay.jump_reset_show_timing_labels": "Show Timing Text",
   "button.pvp-overlay.jump_reset_unit": "Unit",
   "button.pvp-overlay.force_main_hand": "Force Main Hand",
   "button.pvp-overlay.change_position": "Change Position",

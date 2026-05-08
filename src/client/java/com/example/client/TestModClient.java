@@ -124,7 +124,7 @@ public class TestModClient implements ClientModInitializer {
         if (
                 hurtTime == 9 &&
                         previousHurtTime != 9 &&
-                        minecraft.player.isSprinting() &&
+                        isJumpResetSprintRequirementMet(minecraft.player) &&
                         wasRecentlyDamagedByEntity()
         ) {
             recentHurt9Ticks.addLast(clientTickCounter);
@@ -139,6 +139,10 @@ public class TestModClient implements ClientModInitializer {
             jumpResetText = "-";
             jumpResetColor = 0xFFFFFFFF;
         }
+    }
+
+    private static boolean isJumpResetSprintRequirementMet(Player player) {
+        return !CONFIG.jumpResetRequireSprint || player.isSprinting();
     }
 
     private static boolean wasRecentlyDamagedByEntity() {
@@ -184,36 +188,57 @@ public class TestModClient implements ClientModInitializer {
     private static void setJumpResetResult(long diffTicks) {
         lastJumpResetUpdateTick = clientTickCounter;
 
+        jumpResetText = getJumpResetDisplayText(diffTicks);
+
         if (diffTicks == 0) {
-            jumpResetText = Component.translatable("overlay.pvp-overlay.jump_reset.perfect").getString();
             jumpResetColor = parseColorHex(CONFIG.jumpResetPerfectColor, 0xFF55FF55);
         } else if (diffTicks < 0) {
-            jumpResetText = Component.translatable("overlay.pvp-overlay.jump_reset.early").getString()
-                    + " "
-                    + formatJumpResetOffset(diffTicks);
-
             jumpResetColor = parseColorHex(CONFIG.jumpResetEarlyColor, 0xFFFFFF55);
         } else {
-            jumpResetText = Component.translatable("overlay.pvp-overlay.jump_reset.late").getString()
-                    + " "
-                    + formatJumpResetOffset(diffTicks);
-
             jumpResetColor = parseColorHex(CONFIG.jumpResetLateColor, 0xFFFF5555);
         }
+    }
+
+    private static String getJumpResetDisplayText(long diffTicks) {
+        if (diffTicks == 0) {
+            return Component.translatable("overlay.pvp-overlay.jump_reset.perfect").getString();
+        }
+
+        String offset = formatJumpResetOffset(diffTicks);
+
+        if (!CONFIG.jumpResetShowTimingLabels) {
+            return offset;
+        }
+
+        if (diffTicks < 0) {
+            return Component.translatable("overlay.pvp-overlay.jump_reset.early").getString()
+                    + " "
+                    + offset;
+        }
+
+        return Component.translatable("overlay.pvp-overlay.jump_reset.late").getString()
+                + " "
+                + offset;
     }
 
     private static String formatJumpResetOffset(long ticks) {
         String sign = ticks > 0 ? "+" : "-";
         long absTicks = Math.abs(ticks);
+        String unit = getJumpResetUnitSuffix(absTicks);
 
-        return sign + absTicks + getJumpResetUnitSuffix();
+        if (unit.isEmpty()) {
+            return sign + absTicks;
+        }
+
+        return sign + absTicks + " " + unit;
     }
 
-    private static String getJumpResetUnitSuffix() {
+    private static String getJumpResetUnitSuffix(long absTicks) {
         return switch (CONFIG.jumpResetUnitMode) {
-            case 1 -> "ticks";
-            case 2 -> "Ticks";
+            case 1 -> absTicks == 1 ? "tick" : "ticks";
+            case 2 -> absTicks == 1 ? "Tick" : "Ticks";
             case 3 -> "";
+            case 4 -> "t";
             default -> "T";
         };
     }
@@ -308,6 +333,14 @@ public class TestModClient implements ClientModInitializer {
         return CONFIG.showJumpReset;
     }
 
+    public static boolean isJumpResetRequireSprint() {
+        return CONFIG.jumpResetRequireSprint;
+    }
+
+    public static boolean isJumpResetShowTimingLabels() {
+        return CONFIG.jumpResetShowTimingLabels;
+    }
+
     public static int getJumpResetPairWindowTicks() {
         return CONFIG.jumpResetPairWindowTicks;
     }
@@ -321,6 +354,7 @@ public class TestModClient implements ClientModInitializer {
             case 1 -> Component.literal("ticks");
             case 2 -> Component.literal("Ticks");
             case 3 -> Component.translatable("state.pvp-overlay.none");
+            case 4 -> Component.literal("t");
             default -> Component.literal("T");
         };
     }
@@ -357,6 +391,16 @@ public class TestModClient implements ClientModInitializer {
         CONFIG.save();
     }
 
+    public static void toggleJumpResetRequireSprint() {
+        CONFIG.jumpResetRequireSprint = !CONFIG.jumpResetRequireSprint;
+        CONFIG.save();
+    }
+
+    public static void toggleJumpResetShowTimingLabels() {
+        CONFIG.jumpResetShowTimingLabels = !CONFIG.jumpResetShowTimingLabels;
+        CONFIG.save();
+    }
+
     public static void setJumpResetPairWindowTicks(int ticks) {
         CONFIG.jumpResetPairWindowTicks = clampInt(
                 ticks,
@@ -384,11 +428,13 @@ public class TestModClient implements ClientModInitializer {
     }
 
     public static void cycleJumpResetUnitMode() {
-        CONFIG.jumpResetUnitMode++;
-
-        if (CONFIG.jumpResetUnitMode > 3) {
-            CONFIG.jumpResetUnitMode = 0;
-        }
+        CONFIG.jumpResetUnitMode = switch (CONFIG.jumpResetUnitMode) {
+            case 0 -> 4;
+            case 4 -> 1;
+            case 1 -> 2;
+            case 2 -> 3;
+            default -> 0;
+        };
 
         CONFIG.save();
     }
@@ -537,7 +583,7 @@ public class TestModClient implements ClientModInitializer {
         }
 
         if (CONFIG.showJumpReset) {
-            textWidth = Math.max(textWidth, minecraft.font.width(jumpResetFullText()));
+            textWidth = Math.max(textWidth, getJumpResetStableTextWidth(minecraft));
         }
 
         if (textWidth == 0) {
@@ -545,6 +591,23 @@ public class TestModClient implements ClientModInitializer {
         }
 
         return textWidth + paddingX * 2;
+    }
+
+    private static int getJumpResetStableTextWidth(Minecraft minecraft) {
+        String prefix = Component.translatable("overlay.pvp-overlay.jump_reset").getString() + ": ";
+
+        int width = minecraft.font.width(prefix + Component.translatable("overlay.pvp-overlay.jump_reset.perfect").getString());
+
+        int maxOffset = CONFIG.jumpResetPairWindowTicks;
+
+        if (maxOffset <= 0) {
+            return width;
+        }
+
+        width = Math.max(width, minecraft.font.width(prefix + getJumpResetDisplayText(-maxOffset)));
+        width = Math.max(width, minecraft.font.width(prefix + getJumpResetDisplayText(maxOffset)));
+
+        return width;
     }
 
     public static int getOverlayBoxHeight(Minecraft minecraft) {

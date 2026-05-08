@@ -20,6 +20,8 @@ public class PvPOverlayConfig {
     public static final int MAX_JUMP_RESET_DISPLAY_TICKS = 20;
 
     public static final int DEFAULT_JUMP_RESET_UNIT_MODE = 0;
+    public static final boolean DEFAULT_JUMP_RESET_REQUIRE_SPRINT = true;
+    public static final boolean DEFAULT_JUMP_RESET_SHOW_TIMING_LABELS = true;
 
     public static final String DEFAULT_JUMP_RESET_PERFECT_COLOR = "#55FF55";
     public static final String DEFAULT_JUMP_RESET_EARLY_COLOR = "#FFFF55";
@@ -41,8 +43,11 @@ public class PvPOverlayConfig {
     public int jumpResetPairWindowTicks = DEFAULT_JUMP_RESET_PAIR_WINDOW_TICKS;
     public int jumpResetDisplayTicks = DEFAULT_JUMP_RESET_DISPLAY_TICKS;
 
-    // 0 = T, 1 = ticks, 2 = Ticks, 3 = none
+    // 0 = T, 1 = ticks, 2 = Ticks, 3 = none, 4 = t
     public int jumpResetUnitMode = DEFAULT_JUMP_RESET_UNIT_MODE;
+
+    public boolean jumpResetRequireSprint = DEFAULT_JUMP_RESET_REQUIRE_SPRINT;
+    public boolean jumpResetShowTimingLabels = DEFAULT_JUMP_RESET_SHOW_TIMING_LABELS;
 
     public String jumpResetPerfectColor = DEFAULT_JUMP_RESET_PERFECT_COLOR;
     public String jumpResetEarlyColor = DEFAULT_JUMP_RESET_EARLY_COLOR;
@@ -87,7 +92,7 @@ public class PvPOverlayConfig {
                     MAX_JUMP_RESET_DISPLAY_TICKS
             );
 
-            config.jumpResetUnitMode = clampInt(config.jumpResetUnitMode, 0, 3);
+            config.jumpResetUnitMode = clampInt(config.jumpResetUnitMode, 0, 4);
 
             if (!isValidColorHex(config.jumpResetPerfectColor)) {
                 config.jumpResetPerfectColor = DEFAULT_JUMP_RESET_PERFECT_COLOR;

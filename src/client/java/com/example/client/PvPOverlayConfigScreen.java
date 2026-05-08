@@ -4,12 +4,15 @@ import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.client.gui.components.AbstractSliderButton;
 import net.minecraft.client.gui.components.Button;
+import net.minecraft.client.gui.components.Tooltip;
 import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.client.input.KeyEvent;
+import net.minecraft.client.renderer.RenderPipelines;
 import net.minecraft.network.chat.Component;
 import net.minecraft.network.chat.MutableComponent;
 import net.minecraft.network.chat.Style;
 import net.minecraft.network.chat.TextColor;
+import net.minecraft.resources.Identifier;
 
 public class PvPOverlayConfigScreen extends Screen {
     private static final TextColor GREEN = TextColor.fromRgb(0x55FF55);
@@ -17,6 +20,15 @@ public class PvPOverlayConfigScreen extends Screen {
     private static final TextColor WHITE = TextColor.fromRgb(0xFFFFFF);
 
     private static final int DEFAULT_MENU_OPACITY = 25;
+
+    private static final Identifier GEAR_ICON_TEXTURE = Identifier.fromNamespaceAndPath(
+            "pvp-overlay",
+            "textures/gui/config-button-gear.png"
+    );
+
+    private static final int GEAR_ICON_DRAW_SIZE = 14;
+
+    private Button jumpResetSettingsButton;
 
     public PvPOverlayConfigScreen() {
         super(Component.translatable("screen.pvp-overlay.config.title"));
@@ -27,9 +39,11 @@ public class PvPOverlayConfigScreen extends Screen {
         int centerX = this.width / 2;
 
         int buttonWidth = 200;
-        int smallButtonWidth = 24;
         int sliderWidth = 144;
         int resetWidth = 52;
+
+        int settingsButtonWidth = 24;
+        int jumpResetToggleWidth = buttonWidth - settingsButtonWidth - 4;
 
         int leftX = centerX - 205;
         int rightX = centerX + 5;
@@ -67,12 +81,16 @@ public class PvPOverlayConfigScreen extends Screen {
                     TestModClient.toggleShowJumpReset();
                     button.setMessage(jumpResetButtonText());
                 }
-        ).bounds(leftX, startY + row * 3, buttonWidth - smallButtonWidth - 4, 20).build();
+        ).bounds(leftX, startY + row * 3, jumpResetToggleWidth, 20).build();
 
-        Button jumpResetConfigButton = Button.builder(
-                Component.literal("⚙"),
+        jumpResetSettingsButton = Button.builder(
+                Component.literal(" "),
                 button -> Minecraft.getInstance().setScreen(new JumpResetConfigScreen(this))
-        ).bounds(leftX + buttonWidth - smallButtonWidth, startY + row * 3, smallButtonWidth, 20).build();
+        ).bounds(leftX + jumpResetToggleWidth + 4, startY + row * 3, settingsButtonWidth, 20).build();
+
+        jumpResetSettingsButton.setTooltip(Tooltip.create(
+                Component.translatable("screen.pvp-overlay.jump_reset_config.title")
+        ));
 
         Button forceMainHandButton = Button.builder(
                 forceMainHandButtonText(),
@@ -114,7 +132,7 @@ public class PvPOverlayConfigScreen extends Screen {
         this.addRenderableWidget(hitButton);
         this.addRenderableWidget(takenButton);
         this.addRenderableWidget(jumpResetButton);
-        this.addRenderableWidget(jumpResetConfigButton);
+        this.addRenderableWidget(jumpResetSettingsButton);
         this.addRenderableWidget(forceMainHandButton);
         this.addRenderableWidget(changePositionButton);
         this.addRenderableWidget(doneButton);
@@ -145,6 +163,10 @@ public class PvPOverlayConfigScreen extends Screen {
         );
 
         super.render(graphics, mouseX, mouseY, delta);
+
+        if (jumpResetSettingsButton != null) {
+            drawGearIcon(graphics, jumpResetSettingsButton);
+        }
     }
 
     private Component overlayButtonText() {
@@ -183,6 +205,39 @@ public class PvPOverlayConfigScreen extends Screen {
                 .withStyle(Style.EMPTY.withColor(value ? GREEN : RED));
 
         return component.append(state);
+    }
+
+    private void drawGearIcon(GuiGraphics graphics, Button button) {
+        int startX = button.getX() + (button.getWidth() - GEAR_ICON_DRAW_SIZE) / 2;
+        int startY = button.getY() + (button.getHeight() - GEAR_ICON_DRAW_SIZE) / 2;
+
+        int iconColor = getButtonIconColor(button);
+
+        graphics.blit(
+                RenderPipelines.GUI_TEXTURED,
+                GEAR_ICON_TEXTURE,
+                startX,
+                startY,
+                0.0F,
+                0.0F,
+                GEAR_ICON_DRAW_SIZE,
+                GEAR_ICON_DRAW_SIZE,
+                GEAR_ICON_DRAW_SIZE,
+                GEAR_ICON_DRAW_SIZE,
+                iconColor
+        );
+    }
+
+    private int getButtonIconColor(Button button) {
+        if (!button.active) {
+            return 0xFFA0A0A0;
+        }
+
+        if (button.isHoveredOrFocused()) {
+            return 0xFFFFFFFF;
+        }
+
+        return 0xFFE0E0E0;
     }
 
     private static class ConfigOpacitySlider extends AbstractSliderButton {
