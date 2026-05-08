@@ -29,6 +29,20 @@ public class TestModClient implements ClientModInitializer {
     private static String takenMainText = "-";
     private static String takenRoundedDigit = "";
 
+    private static String jumpResetText = "-";
+    private static int jumpResetColor = 0xFFFFFFFF;
+
+    private static boolean previousJumpDown = false;
+    private static int previousHurtTime = 0;
+
+    private static long lastJumpTimeMs = -1L;
+    private static long lastHurt9TimeMs = -1L;
+    private static long lastJumpResetUpdateMs = -1L;
+
+    private static final long JUMP_RESET_MAX_WINDOW_MS = 600L;
+    private static final long JUMP_RESET_HIDE_AFTER_MS = 1500L;
+    private static final long JUMP_RESET_PERFECT_WINDOW_MS = 75L;
+
     private static KeyMapping openConfigKey;
 
     @Override
@@ -47,6 +61,7 @@ public class TestModClient implements ClientModInitializer {
             }
 
             applyForcedOtherPlayerMainHand(client);
+            updateJumpReset(client);
         });
 
         HudRenderCallback.EVENT.register((graphics, tickDelta) -> {
@@ -77,6 +92,72 @@ public class TestModClient implements ClientModInitializer {
 
             player.setMainArm(forcedArm);
         }
+    }
+
+    private static void updateJumpReset(Minecraft minecraft) {
+        if (minecraft.player == null || minecraft.level == null) {
+            previousJumpDown = false;
+            previousHurtTime = 0;
+            return;
+        }
+
+        long now = System.currentTimeMillis();
+
+        boolean jumpDown = minecraft.options.keyJump.isDown();
+
+        if (jumpDown && !previousJumpDown) {
+            lastJumpTimeMs = now;
+            updateJumpResetResult(now);
+        }
+
+        previousJumpDown = jumpDown;
+
+        int hurtTime = minecraft.player.hurtTime;
+
+        if (hurtTime == 9 && previousHurtTime != 9 && minecraft.player.isSprinting()) {
+            lastHurt9TimeMs = now;
+            updateJumpResetResult(now);
+        }
+
+        previousHurtTime = hurtTime;
+
+        if (lastJumpResetUpdateMs > 0 && now - lastJumpResetUpdateMs > JUMP_RESET_HIDE_AFTER_MS) {
+            jumpResetText = "-";
+            jumpResetColor = 0xFFFFFFFF;
+        }
+    }
+
+    private static void updateJumpResetResult(long now) {
+        if (lastJumpTimeMs < 0 || lastHurt9TimeMs < 0) {
+            return;
+        }
+
+        long diff = lastJumpTimeMs - lastHurt9TimeMs;
+
+        if (Math.abs(diff) > JUMP_RESET_MAX_WINDOW_MS) {
+            return;
+        }
+
+        lastJumpResetUpdateMs = now;
+
+        if (Math.abs(diff) <= JUMP_RESET_PERFECT_WINDOW_MS) {
+            jumpResetText = "Perfect " + formatSignedMs(diff);
+            jumpResetColor = 0xFF55FF55;
+        } else if (diff < 0) {
+            jumpResetText = "Too Early " + formatSignedMs(diff);
+            jumpResetColor = 0xFFFFFF55;
+        } else {
+            jumpResetText = "Too Late " + formatSignedMs(diff);
+            jumpResetColor = 0xFFFF5555;
+        }
+    }
+
+    private static String formatSignedMs(long value) {
+        if (value > 0) {
+            return "+" + value + " ms";
+        }
+
+        return value + " ms";
     }
 
     public static boolean isOpenConfigKey(KeyEvent input) {
@@ -141,6 +222,10 @@ public class TestModClient implements ClientModInitializer {
         return CONFIG.showTaken;
     }
 
+    public static boolean isShowJumpReset() {
+        return CONFIG.showJumpReset;
+    }
+
     public static void toggleOverlayEnabled() {
         CONFIG.overlayEnabled = !CONFIG.overlayEnabled;
         CONFIG.save();
@@ -153,6 +238,11 @@ public class TestModClient implements ClientModInitializer {
 
     public static void toggleShowTaken() {
         CONFIG.showTaken = !CONFIG.showTaken;
+        CONFIG.save();
+    }
+
+    public static void toggleShowJumpReset() {
+        CONFIG.showJumpReset = !CONFIG.showJumpReset;
         CONFIG.save();
     }
 
@@ -260,6 +350,10 @@ public class TestModClient implements ClientModInitializer {
             textWidth = Math.max(textWidth, minecraft.font.width(takenFullText()));
         }
 
+        if (CONFIG.showJumpReset) {
+            textWidth = Math.max(textWidth, minecraft.font.width(jumpResetFullText()));
+        }
+
         if (textWidth == 0) {
             textWidth = minecraft.font.width(Component.translatable("overlay.pvp-overlay.title").getString());
         }
@@ -286,6 +380,7 @@ public class TestModClient implements ClientModInitializer {
     public static void drawOverlay(GuiGraphics graphics, Minecraft minecraft) {
         String hitPrefix = Component.translatable("overlay.pvp-overlay.hit").getString() + ": ";
         String takenPrefix = Component.translatable("overlay.pvp-overlay.taken").getString() + ": ";
+        String jumpResetPrefix = Component.translatable("overlay.pvp-overlay.jump_reset").getString() + ": ";
         String suffix = " " + Component.translatable("overlay.pvp-overlay.blocks").getString();
 
         int paddingX = 8;
@@ -338,6 +433,20 @@ public class TestModClient implements ClientModInitializer {
                     takenRoundedDigit,
                     suffix
             );
+
+            textY += fontHeight + lineGap;
+        }
+
+        if (CONFIG.showJumpReset) {
+            drawSimpleLine(
+                    graphics,
+                    minecraft,
+                    textX,
+                    textY,
+                    jumpResetPrefix,
+                    jumpResetText,
+                    jumpResetColor
+            );
         }
     }
 
@@ -349,6 +458,10 @@ public class TestModClient implements ClientModInitializer {
         }
 
         if (CONFIG.showTaken) {
+            visibleLines++;
+        }
+
+        if (CONFIG.showJumpReset) {
             visibleLines++;
         }
 
@@ -371,6 +484,12 @@ public class TestModClient implements ClientModInitializer {
                 + takenRoundedDigit
                 + " "
                 + Component.translatable("overlay.pvp-overlay.blocks").getString();
+    }
+
+    private static String jumpResetFullText() {
+        return Component.translatable("overlay.pvp-overlay.jump_reset").getString()
+                + ": "
+                + jumpResetText;
     }
 
     private static void setHitDistance(double distance) {
@@ -468,6 +587,38 @@ public class TestModClient implements ClientModInitializer {
                 textX,
                 y,
                 0xFFFFFFFF,
+                false
+        );
+    }
+
+    private static void drawSimpleLine(
+            GuiGraphics graphics,
+            Minecraft minecraft,
+            int x,
+            int y,
+            String prefix,
+            String value,
+            int valueColor
+    ) {
+        int textX = x;
+
+        graphics.drawString(
+                minecraft.font,
+                prefix,
+                textX,
+                y,
+                0xFFFFFFFF,
+                false
+        );
+
+        textX += minecraft.font.width(prefix);
+
+        graphics.drawString(
+                minecraft.font,
+                value,
+                textX,
+                y,
+                valueColor,
                 false
         );
     }

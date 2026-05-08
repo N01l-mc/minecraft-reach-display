@@ -21,6 +21,7 @@ public class PvPOverlayConfig {
     public boolean overlayEnabled = true;
     public boolean showHit = true;
     public boolean showTaken = true;
+    public boolean showJumpReset = true;
 
     public boolean customPosition = false;
     public int overlayX = 0;

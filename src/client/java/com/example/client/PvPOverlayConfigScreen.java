@@ -60,6 +60,14 @@ public class PvPOverlayConfigScreen extends Screen {
                 }
         ).bounds(leftX, startY + row * 2, buttonWidth, 20).build();
 
+        Button jumpResetButton = Button.builder(
+                jumpResetButtonText(),
+                button -> {
+                    TestModClient.toggleShowJumpReset();
+                    button.setMessage(jumpResetButtonText());
+                }
+        ).bounds(leftX, startY + row * 3, buttonWidth, 20).build();
+
         Button forceMainHandButton = Button.builder(
                 forceMainHandButtonText(),
                 button -> {
@@ -79,7 +87,7 @@ public class PvPOverlayConfigScreen extends Screen {
         ).bounds(rightX, startY + row * 2, buttonWidth, 20).build();
 
         int sliderX = centerX - 100;
-        int sliderY = startY + row * 3 + 10;
+        int sliderY = startY + row * 4 + 10;
 
         ConfigOpacitySlider opacitySlider = new ConfigOpacitySlider(
                 sliderX,
@@ -99,6 +107,7 @@ public class PvPOverlayConfigScreen extends Screen {
         this.addRenderableWidget(overlayButton);
         this.addRenderableWidget(hitButton);
         this.addRenderableWidget(takenButton);
+        this.addRenderableWidget(jumpResetButton);
         this.addRenderableWidget(forceMainHandButton);
         this.addRenderableWidget(changePositionButton);
         this.addRenderableWidget(doneButton);
@@ -141,6 +150,10 @@ public class PvPOverlayConfigScreen extends Screen {
 
     private Component takenButtonText() {
         return settingText("button.pvp-overlay.show_taken", TestModClient.isShowTaken());
+    }
+
+    private Component jumpResetButtonText() {
+        return settingText("button.pvp-overlay.show_jump_reset", TestModClient.isShowJumpReset());
     }
 
     private Component forceMainHandButtonText() {

@@ -4,6 +4,7 @@
   "overlay.pvp-overlay.title": "PvP Overlay",
   "overlay.pvp-overlay.hit": "Hit",
   "overlay.pvp-overlay.taken": "Taken",
+  "overlay.pvp-overlay.jump_reset": "Jump Reset",
   "overlay.pvp-overlay.blocks": "blocks",
 
   "screen.pvp-overlay.config.title": "PvP Overlay Config",
@@ -13,6 +14,7 @@
   "button.pvp-overlay.overlay": "Overlay",
   "button.pvp-overlay.show_hit": "Show Hit",
   "button.pvp-overlay.show_taken": "Show Taken",
+  "button.pvp-overlay.show_jump_reset": "Show Jump Reset",
   "button.pvp-overlay.force_main_hand": "Force Main Hand",
   "button.pvp-overlay.change_position": "Change Position",
   "button.pvp-overlay.reset_position": "Reset Position",
