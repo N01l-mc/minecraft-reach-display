@@ -429,10 +429,11 @@ public class TestModClient implements ClientModInitializer {
 
     public static void cycleJumpResetUnitMode() {
         CONFIG.jumpResetUnitMode = switch (CONFIG.jumpResetUnitMode) {
-            case 0 -> 4;
-            case 4 -> 1;
-            case 1 -> 2;
-            case 2 -> 3;
+            case 3 -> 0; // None -> T
+            case 0 -> 4; // T -> t
+            case 4 -> 2; // t -> Ticks
+            case 2 -> 1; // Ticks -> ticks
+            case 1 -> 3; // ticks -> None
             default -> 0;
         };
 
