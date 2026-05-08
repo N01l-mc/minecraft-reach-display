@@ -10,6 +10,9 @@
   "overlay.pvp-overlay.jump_reset.late": "Late",
   "overlay.pvp-overlay.blocks": "blocks",
 
+  "tooltip.pvp-overlay.taken": "Shows the distance from the attacker to your hitbox when you receive a hit. Due to lag, server corrections, or delayed packets, values above vanilla reach can appear. This does not automatically mean the opponent is cheating.",
+  "tooltip.pvp-overlay.force_main_hand": "Opponents can choose their own main hand. This option renders other players according to your selected setting, regardless of what they selected. LEFT renders left, RIGHT renders right. OFF does not interfere with rendering, so Minecraft's default behaviour stays active and you see the main hand the opponent selected.",
+
   "screen.pvp-overlay.config.title": "PvP Overlay Config",
   "screen.pvp-overlay.position.title": "Move PvP Overlay",
   "screen.pvp-overlay.position.instructions": "Drag the overlay box with the left mouse button.",

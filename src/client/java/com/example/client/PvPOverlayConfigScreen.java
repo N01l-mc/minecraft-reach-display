@@ -3,10 +3,13 @@ package com.example.client;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.client.gui.components.AbstractSliderButton;
+import net.minecraft.client.gui.components.AbstractWidget;
 import net.minecraft.client.gui.components.Button;
 import net.minecraft.client.gui.components.Tooltip;
+import net.minecraft.client.gui.narration.NarrationElementOutput;
 import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.client.input.KeyEvent;
+import net.minecraft.client.input.MouseButtonEvent;
 import net.minecraft.client.renderer.RenderPipelines;
 import net.minecraft.network.chat.Component;
 import net.minecraft.network.chat.MutableComponent;
@@ -45,6 +48,9 @@ public class PvPOverlayConfigScreen extends Screen {
         int settingsButtonWidth = 24;
         int jumpResetToggleWidth = buttonWidth - settingsButtonWidth - 4;
 
+        int infoButtonSize = 12;
+        int infoButtonPadding = 4;
+
         int leftX = centerX - 205;
         int rightX = centerX + 5;
 
@@ -75,6 +81,14 @@ public class PvPOverlayConfigScreen extends Screen {
                 }
         ).bounds(leftX, startY + row * 2, buttonWidth, 20).build();
 
+        InfoIconWidget takenInfoIcon = new InfoIconWidget(
+                leftX + buttonWidth - infoButtonSize - infoButtonPadding,
+                startY + row * 2 + infoButtonPadding,
+                infoButtonSize,
+                infoButtonSize,
+                Component.translatable("tooltip.pvp-overlay.taken")
+        );
+
         Button jumpResetButton = Button.builder(
                 jumpResetButtonText(),
                 button -> {
@@ -99,6 +113,14 @@ public class PvPOverlayConfigScreen extends Screen {
                     button.setMessage(forceMainHandButtonText());
                 }
         ).bounds(rightX, startY, buttonWidth, 20).build();
+
+        InfoIconWidget forceMainHandInfoIcon = new InfoIconWidget(
+                rightX + buttonWidth - infoButtonSize - infoButtonPadding,
+                startY + infoButtonPadding,
+                infoButtonSize,
+                infoButtonSize,
+                Component.translatable("tooltip.pvp-overlay.force_main_hand")
+        );
 
         Button changePositionButton = Button.builder(
                 Component.translatable("button.pvp-overlay.change_position"),
@@ -131,9 +153,11 @@ public class PvPOverlayConfigScreen extends Screen {
         this.addRenderableWidget(overlayButton);
         this.addRenderableWidget(hitButton);
         this.addRenderableWidget(takenButton);
+        this.addRenderableWidget(takenInfoIcon);
         this.addRenderableWidget(jumpResetButton);
         this.addRenderableWidget(jumpResetSettingsButton);
         this.addRenderableWidget(forceMainHandButton);
+        this.addRenderableWidget(forceMainHandInfoIcon);
         this.addRenderableWidget(changePositionButton);
         this.addRenderableWidget(doneButton);
         this.addRenderableWidget(opacitySlider);
@@ -238,6 +262,48 @@ public class PvPOverlayConfigScreen extends Screen {
         }
 
         return 0xFFE0E0E0;
+    }
+
+    private static class InfoIconWidget extends AbstractWidget {
+        public InfoIconWidget(int x, int y, int width, int height, Component tooltip) {
+            super(x, y, width, height, Component.literal("Info"));
+            this.setTooltip(Tooltip.create(tooltip));
+        }
+
+        @Override
+        protected void renderWidget(GuiGraphics graphics, int mouseX, int mouseY, float delta) {
+            int x = this.getX();
+            int y = this.getY();
+            int width = this.getWidth();
+            int height = this.getHeight();
+
+            int centerX = x + width / 2;
+            int centerY = y + height / 2;
+
+            int fillColor = this.isHoveredOrFocused() ? 0xFF3399FF : 0xFF1E6EDB;
+            int outlineColor = 0xFFFFFFFF;
+
+            graphics.fill(centerX - 3, centerY - 5, centerX + 4, centerY + 5, outlineColor);
+            graphics.fill(centerX - 5, centerY - 3, centerX + 6, centerY + 3, outlineColor);
+            graphics.fill(centerX - 4, centerY - 4, centerX + 5, centerY + 4, outlineColor);
+
+            graphics.fill(centerX - 2, centerY - 4, centerX + 3, centerY + 4, fillColor);
+            graphics.fill(centerX - 4, centerY - 2, centerX + 5, centerY + 2, fillColor);
+            graphics.fill(centerX - 3, centerY - 3, centerX + 4, centerY + 3, fillColor);
+
+            graphics.fill(centerX, centerY - 3, centerX + 1, centerY - 2, 0xFFFFFFFF);
+            graphics.fill(centerX, centerY - 1, centerX + 1, centerY + 3, 0xFFFFFFFF);
+        }
+
+        @Override
+        public boolean mouseClicked(MouseButtonEvent click, boolean doubleClick) {
+            return this.visible && this.active && this.isMouseOver(click.x(), click.y());
+        }
+
+        @Override
+        protected void updateWidgetNarration(NarrationElementOutput narrationElementOutput) {
+            this.defaultButtonNarrationText(narrationElementOutput);
+        }
     }
 
     private static class ConfigOpacitySlider extends AbstractSliderButton {
