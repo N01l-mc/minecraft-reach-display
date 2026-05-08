@@ -18,6 +18,8 @@ import net.minecraft.world.phys.EntityHitResult;
 import net.minecraft.world.phys.Vec3;
 import org.lwjgl.glfw.GLFW;
 
+import java.util.ArrayDeque;
+import java.util.Iterator;
 import java.util.Locale;
 
 public class TestModClient implements ClientModInitializer {
@@ -35,13 +37,15 @@ public class TestModClient implements ClientModInitializer {
     private static boolean previousJumpDown = false;
     private static int previousHurtTime = 0;
 
-    private static long lastJumpTimeMs = -1L;
-    private static long lastHurt9TimeMs = -1L;
-    private static long lastJumpResetUpdateMs = -1L;
+    private static long clientTickCounter = 0L;
+    private static long lastJumpResetUpdateTick = -1L;
 
-    private static final long JUMP_RESET_MAX_WINDOW_MS = 600L;
-    private static final long JUMP_RESET_HIDE_AFTER_MS = 1500L;
-    private static final long JUMP_RESET_PERFECT_WINDOW_MS = 75L;
+    private static long lastEntityDamageTick = -1L;
+
+    private static final int ENTITY_DAMAGE_VALID_TICKS = 6;
+
+    private static final ArrayDeque<Long> recentJumpTicks = new ArrayDeque<>();
+    private static final ArrayDeque<Long> recentHurt9Ticks = new ArrayDeque<>();
 
     private static KeyMapping openConfigKey;
 
@@ -54,6 +58,8 @@ public class TestModClient implements ClientModInitializer {
         ));
 
         ClientTickEvents.END_CLIENT_TICK.register(client -> {
+            clientTickCounter++;
+
             while (openConfigKey.consumeClick()) {
                 if (client.screen == null) {
                     client.setScreen(new PvPOverlayConfigScreen());
@@ -98,66 +104,140 @@ public class TestModClient implements ClientModInitializer {
         if (minecraft.player == null || minecraft.level == null) {
             previousJumpDown = false;
             previousHurtTime = 0;
+            lastEntityDamageTick = -1L;
+            recentJumpTicks.clear();
+            recentHurt9Ticks.clear();
             return;
         }
-
-        long now = System.currentTimeMillis();
 
         boolean jumpDown = minecraft.options.keyJump.isDown();
 
         if (jumpDown && !previousJumpDown) {
-            lastJumpTimeMs = now;
-            updateJumpResetResult(now);
+            recentJumpTicks.addLast(clientTickCounter);
+            tryPairJumpReset();
         }
 
         previousJumpDown = jumpDown;
 
         int hurtTime = minecraft.player.hurtTime;
 
-        if (hurtTime == 9 && previousHurtTime != 9 && minecraft.player.isSprinting()) {
-            lastHurt9TimeMs = now;
-            updateJumpResetResult(now);
+        if (
+                hurtTime == 9 &&
+                        previousHurtTime != 9 &&
+                        minecraft.player.isSprinting() &&
+                        wasRecentlyDamagedByEntity()
+        ) {
+            recentHurt9Ticks.addLast(clientTickCounter);
+            tryPairJumpReset();
         }
 
         previousHurtTime = hurtTime;
 
-        if (lastJumpResetUpdateMs > 0 && now - lastJumpResetUpdateMs > JUMP_RESET_HIDE_AFTER_MS) {
+        pruneOldJumpResetTicks();
+
+        if (lastJumpResetUpdateTick > 0 && clientTickCounter - lastJumpResetUpdateTick > CONFIG.jumpResetDisplayTicks) {
             jumpResetText = "-";
             jumpResetColor = 0xFFFFFFFF;
         }
     }
 
-    private static void updateJumpResetResult(long now) {
-        if (lastJumpTimeMs < 0 || lastHurt9TimeMs < 0) {
+    private static boolean wasRecentlyDamagedByEntity() {
+        return lastEntityDamageTick > 0 &&
+                clientTickCounter - lastEntityDamageTick <= ENTITY_DAMAGE_VALID_TICKS;
+    }
+
+    private static void tryPairJumpReset() {
+        if (recentJumpTicks.isEmpty() || recentHurt9Ticks.isEmpty()) {
             return;
         }
 
-        long diff = lastJumpTimeMs - lastHurt9TimeMs;
+        int maxWindowTicks = CONFIG.jumpResetPairWindowTicks;
 
-        if (Math.abs(diff) > JUMP_RESET_MAX_WINDOW_MS) {
+        Long bestJumpTick = null;
+        Long bestHurtTick = null;
+        long bestAbsDiff = Long.MAX_VALUE;
+
+        for (Long jumpTick : recentJumpTicks) {
+            for (Long hurtTick : recentHurt9Ticks) {
+                long diff = jumpTick - hurtTick;
+                long absDiff = Math.abs(diff);
+
+                if (absDiff <= maxWindowTicks && absDiff < bestAbsDiff) {
+                    bestAbsDiff = absDiff;
+                    bestJumpTick = jumpTick;
+                    bestHurtTick = hurtTick;
+                }
+            }
+        }
+
+        if (bestJumpTick == null || bestHurtTick == null) {
             return;
         }
 
-        lastJumpResetUpdateMs = now;
+        recentJumpTicks.remove(bestJumpTick);
+        recentHurt9Ticks.remove(bestHurtTick);
 
-        if (Math.abs(diff) <= JUMP_RESET_PERFECT_WINDOW_MS) {
-            jumpResetText = "Perfect " + formatSignedMs(diff);
-            jumpResetColor = 0xFF55FF55;
-        } else if (diff < 0) {
-            jumpResetText = "Too Early " + formatSignedMs(diff);
-            jumpResetColor = 0xFFFFFF55;
+        long diffTicks = bestJumpTick - bestHurtTick;
+        setJumpResetResult(diffTicks);
+    }
+
+    private static void setJumpResetResult(long diffTicks) {
+        lastJumpResetUpdateTick = clientTickCounter;
+
+        if (diffTicks == 0) {
+            jumpResetText = Component.translatable("overlay.pvp-overlay.jump_reset.perfect").getString();
+            jumpResetColor = parseColorHex(CONFIG.jumpResetPerfectColor, 0xFF55FF55);
+        } else if (diffTicks < 0) {
+            jumpResetText = Component.translatable("overlay.pvp-overlay.jump_reset.early").getString()
+                    + " "
+                    + formatJumpResetOffset(diffTicks);
+
+            jumpResetColor = parseColorHex(CONFIG.jumpResetEarlyColor, 0xFFFFFF55);
         } else {
-            jumpResetText = "Too Late " + formatSignedMs(diff);
-            jumpResetColor = 0xFFFF5555;
+            jumpResetText = Component.translatable("overlay.pvp-overlay.jump_reset.late").getString()
+                    + " "
+                    + formatJumpResetOffset(diffTicks);
+
+            jumpResetColor = parseColorHex(CONFIG.jumpResetLateColor, 0xFFFF5555);
         }
     }
 
-    private static String formatSignedMs(long value) {
-        if (value > 0) {
-            return "+" + value + " ms";
-        }
+    private static String formatJumpResetOffset(long ticks) {
+        String sign = ticks > 0 ? "+" : "-";
+        long absTicks = Math.abs(ticks);
 
-        return value + " ms";
+        return sign + absTicks + getJumpResetUnitSuffix();
+    }
+
+    private static String getJumpResetUnitSuffix() {
+        return switch (CONFIG.jumpResetUnitMode) {
+            case 1 -> "ticks";
+            case 2 -> "Ticks";
+            case 3 -> "";
+            default -> "T";
+        };
+    }
+
+    private static void pruneOldJumpResetTicks() {
+        long maxAge = Math.max(
+                CONFIG.jumpResetPairWindowTicks,
+                CONFIG.jumpResetDisplayTicks
+        ) + 5L;
+
+        pruneDequeOlderThan(recentJumpTicks, clientTickCounter - maxAge);
+        pruneDequeOlderThan(recentHurt9Ticks, clientTickCounter - maxAge);
+    }
+
+    private static void pruneDequeOlderThan(ArrayDeque<Long> deque, long minAllowedTick) {
+        Iterator<Long> iterator = deque.iterator();
+
+        while (iterator.hasNext()) {
+            long tick = iterator.next();
+
+            if (tick < minAllowedTick) {
+                iterator.remove();
+            }
+        }
     }
 
     public static boolean isOpenConfigKey(KeyEvent input) {
@@ -200,6 +280,8 @@ public class TestModClient implements ClientModInitializer {
             return;
         }
 
+        lastEntityDamageTick = clientTickCounter;
+
         Vec3 attackerEyes = attacker.getEyePosition();
         AABB myHitbox = minecraft.player.getBoundingBox();
 
@@ -226,6 +308,35 @@ public class TestModClient implements ClientModInitializer {
         return CONFIG.showJumpReset;
     }
 
+    public static int getJumpResetPairWindowTicks() {
+        return CONFIG.jumpResetPairWindowTicks;
+    }
+
+    public static int getJumpResetDisplayTicks() {
+        return CONFIG.jumpResetDisplayTicks;
+    }
+
+    public static Component getJumpResetUnitText() {
+        return switch (CONFIG.jumpResetUnitMode) {
+            case 1 -> Component.literal("ticks");
+            case 2 -> Component.literal("Ticks");
+            case 3 -> Component.translatable("state.pvp-overlay.none");
+            default -> Component.literal("T");
+        };
+    }
+
+    public static String getJumpResetPerfectColorHex() {
+        return CONFIG.jumpResetPerfectColor;
+    }
+
+    public static String getJumpResetEarlyColorHex() {
+        return CONFIG.jumpResetEarlyColor;
+    }
+
+    public static String getJumpResetLateColorHex() {
+        return CONFIG.jumpResetLateColor;
+    }
+
     public static void toggleOverlayEnabled() {
         CONFIG.overlayEnabled = !CONFIG.overlayEnabled;
         CONFIG.save();
@@ -243,6 +354,81 @@ public class TestModClient implements ClientModInitializer {
 
     public static void toggleShowJumpReset() {
         CONFIG.showJumpReset = !CONFIG.showJumpReset;
+        CONFIG.save();
+    }
+
+    public static void setJumpResetPairWindowTicks(int ticks) {
+        CONFIG.jumpResetPairWindowTicks = clampInt(
+                ticks,
+                PvPOverlayConfig.MIN_JUMP_RESET_PAIR_WINDOW_TICKS,
+                PvPOverlayConfig.MAX_JUMP_RESET_PAIR_WINDOW_TICKS
+        );
+        CONFIG.save();
+    }
+
+    public static void resetJumpResetPairWindowTicks() {
+        setJumpResetPairWindowTicks(PvPOverlayConfig.DEFAULT_JUMP_RESET_PAIR_WINDOW_TICKS);
+    }
+
+    public static void setJumpResetDisplayTicks(int ticks) {
+        CONFIG.jumpResetDisplayTicks = clampInt(
+                ticks,
+                PvPOverlayConfig.MIN_JUMP_RESET_DISPLAY_TICKS,
+                PvPOverlayConfig.MAX_JUMP_RESET_DISPLAY_TICKS
+        );
+        CONFIG.save();
+    }
+
+    public static void resetJumpResetDisplayTicks() {
+        setJumpResetDisplayTicks(PvPOverlayConfig.DEFAULT_JUMP_RESET_DISPLAY_TICKS);
+    }
+
+    public static void cycleJumpResetUnitMode() {
+        CONFIG.jumpResetUnitMode++;
+
+        if (CONFIG.jumpResetUnitMode > 3) {
+            CONFIG.jumpResetUnitMode = 0;
+        }
+
+        CONFIG.save();
+    }
+
+    public static void setJumpResetPerfectColorHex(String value) {
+        CONFIG.jumpResetPerfectColor = PvPOverlayConfig.normalizeColorHex(
+                value,
+                PvPOverlayConfig.DEFAULT_JUMP_RESET_PERFECT_COLOR
+        );
+        CONFIG.save();
+    }
+
+    public static void setJumpResetEarlyColorHex(String value) {
+        CONFIG.jumpResetEarlyColor = PvPOverlayConfig.normalizeColorHex(
+                value,
+                PvPOverlayConfig.DEFAULT_JUMP_RESET_EARLY_COLOR
+        );
+        CONFIG.save();
+    }
+
+    public static void setJumpResetLateColorHex(String value) {
+        CONFIG.jumpResetLateColor = PvPOverlayConfig.normalizeColorHex(
+                value,
+                PvPOverlayConfig.DEFAULT_JUMP_RESET_LATE_COLOR
+        );
+        CONFIG.save();
+    }
+
+    public static void resetJumpResetPerfectColor() {
+        CONFIG.jumpResetPerfectColor = PvPOverlayConfig.DEFAULT_JUMP_RESET_PERFECT_COLOR;
+        CONFIG.save();
+    }
+
+    public static void resetJumpResetEarlyColor() {
+        CONFIG.jumpResetEarlyColor = PvPOverlayConfig.DEFAULT_JUMP_RESET_EARLY_COLOR;
+        CONFIG.save();
+    }
+
+    public static void resetJumpResetLateColor() {
+        CONFIG.jumpResetLateColor = PvPOverlayConfig.DEFAULT_JUMP_RESET_LATE_COLOR;
         CONFIG.save();
     }
 
@@ -526,6 +712,20 @@ public class TestModClient implements ClientModInitializer {
         double z = clamp(point.z, box.minZ, box.maxZ);
 
         return new Vec3(x, y, z);
+    }
+
+    private static int parseColorHex(String value, int fallback) {
+        if (!PvPOverlayConfig.isValidColorHex(value)) {
+            return fallback;
+        }
+
+        String normalized = value.trim();
+
+        if (normalized.startsWith("#")) {
+            normalized = normalized.substring(1);
+        }
+
+        return 0xFF000000 | Integer.parseInt(normalized, 16);
     }
 
     private static double clamp(double value, double min, double max) {

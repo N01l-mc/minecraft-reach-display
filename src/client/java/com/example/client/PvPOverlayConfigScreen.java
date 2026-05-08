@@ -27,6 +27,7 @@ public class PvPOverlayConfigScreen extends Screen {
         int centerX = this.width / 2;
 
         int buttonWidth = 200;
+        int smallButtonWidth = 24;
         int sliderWidth = 144;
         int resetWidth = 52;
 
@@ -66,7 +67,12 @@ public class PvPOverlayConfigScreen extends Screen {
                     TestModClient.toggleShowJumpReset();
                     button.setMessage(jumpResetButtonText());
                 }
-        ).bounds(leftX, startY + row * 3, buttonWidth, 20).build();
+        ).bounds(leftX, startY + row * 3, buttonWidth - smallButtonWidth - 4, 20).build();
+
+        Button jumpResetConfigButton = Button.builder(
+                Component.literal("⚙"),
+                button -> Minecraft.getInstance().setScreen(new JumpResetConfigScreen(this))
+        ).bounds(leftX + buttonWidth - smallButtonWidth, startY + row * 3, smallButtonWidth, 20).build();
 
         Button forceMainHandButton = Button.builder(
                 forceMainHandButtonText(),
@@ -108,6 +114,7 @@ public class PvPOverlayConfigScreen extends Screen {
         this.addRenderableWidget(hitButton);
         this.addRenderableWidget(takenButton);
         this.addRenderableWidget(jumpResetButton);
+        this.addRenderableWidget(jumpResetConfigButton);
         this.addRenderableWidget(forceMainHandButton);
         this.addRenderableWidget(changePositionButton);
         this.addRenderableWidget(doneButton);
