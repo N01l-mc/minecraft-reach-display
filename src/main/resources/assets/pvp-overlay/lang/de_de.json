@@ -10,8 +10,8 @@
   "overlay.pvp-overlay.jump_reset.late": "Zu spät",
   "overlay.pvp-overlay.blocks": "Blöcke",
 
-  "tooltip.pvp-overlay.taken": "Zeigt die Entfernung vom Angreifer zu deiner Hitbox beim eingehenden Treffer. Durch Lag, Server-Korrekturen oder verzögerte Pakete können Werte über der Vanilla-Reichweite angezeigt werden. Das bedeutet nicht automatisch, dass der Gegner cheatet.",
-  "tooltip.pvp-overlay.force_main_hand": "Gegner können ihre Haupthand selbst einstellen. Diese Option rendert gegnerische Spieler unabhängig von deren Einstellung so, wie du es hier auswählst. LINKS rendert links, RECHTS rendert rechts. AUS greift nicht ins Rendering ein, dadurch bleibt das normale Minecraft-Verhalten erhalten und du siehst die Haupthand, die der Gegner eingestellt hat.",
+  "tooltip.pvp-overlay.taken": "Zeigt die Entfernung von der angreifenden Person zu deiner Hitbox beim eingehenden Treffer. Durch Lag, Server-Korrekturen oder verzögerte Pakete können Werte über der Vanilla-Reichweite angezeigt werden. Das bedeutet nicht automatisch, dass die andere Person cheatet.",
+  "tooltip.pvp-overlay.force_main_hand": "Andere Spieler*innen können ihre Haupthand selbst einstellen. Diese Option rendert gegnerische Spieler*innen unabhängig von deren Einstellung so, wie du es hier auswählst. LINKS rendert die linke Hand, RECHTS rendert die rechte Hand. AUS greift nicht ins Rendering ein, dadurch bleibt das normale Minecraft-Verhalten erhalten und du siehst die Haupthand, die die andere Person eingestellt hat.",
 
   "screen.pvp-overlay.config.title": "PvP-Overlay-Konfiguration",
   "screen.pvp-overlay.position.title": "PvP-Overlay verschieben",
