@@ -19,7 +19,9 @@ import net.minecraft.world.phys.Vec3;
 import org.lwjgl.glfw.GLFW;
 
 import java.util.ArrayDeque;
+import java.util.ArrayList;
 import java.util.Iterator;
+import java.util.List;
 import java.util.Locale;
 
 public class TestModClient implements ClientModInitializer {
@@ -66,6 +68,8 @@ public class TestModClient implements ClientModInitializer {
                 }
             }
 
+            CONFIG.ensureEnabledModulesHaveGroups();
+
             applyForcedOtherPlayerMainHand(client);
             updateJumpReset(client);
         });
@@ -76,7 +80,7 @@ public class TestModClient implements ClientModInitializer {
             }
 
             Minecraft minecraft = Minecraft.getInstance();
-            drawOverlay(graphics, minecraft);
+            drawOverlay(graphics, minecraft, false);
         });
     }
 
@@ -373,32 +377,35 @@ public class TestModClient implements ClientModInitializer {
 
     public static void toggleOverlayEnabled() {
         CONFIG.overlayEnabled = !CONFIG.overlayEnabled;
-        CONFIG.save();
+        saveConfig();
     }
 
     public static void toggleShowHit() {
         CONFIG.showHit = !CONFIG.showHit;
-        CONFIG.save();
+        CONFIG.ensureEnabledModulesHaveGroups();
+        saveConfig();
     }
 
     public static void toggleShowTaken() {
         CONFIG.showTaken = !CONFIG.showTaken;
-        CONFIG.save();
+        CONFIG.ensureEnabledModulesHaveGroups();
+        saveConfig();
     }
 
     public static void toggleShowJumpReset() {
         CONFIG.showJumpReset = !CONFIG.showJumpReset;
-        CONFIG.save();
+        CONFIG.ensureEnabledModulesHaveGroups();
+        saveConfig();
     }
 
     public static void toggleJumpResetRequireSprint() {
         CONFIG.jumpResetRequireSprint = !CONFIG.jumpResetRequireSprint;
-        CONFIG.save();
+        saveConfig();
     }
 
     public static void toggleJumpResetShowTimingLabels() {
         CONFIG.jumpResetShowTimingLabels = !CONFIG.jumpResetShowTimingLabels;
-        CONFIG.save();
+        saveConfig();
     }
 
     public static void setJumpResetPairWindowTicks(int ticks) {
@@ -407,7 +414,7 @@ public class TestModClient implements ClientModInitializer {
                 PvPOverlayConfig.MIN_JUMP_RESET_PAIR_WINDOW_TICKS,
                 PvPOverlayConfig.MAX_JUMP_RESET_PAIR_WINDOW_TICKS
         );
-        CONFIG.save();
+        saveConfig();
     }
 
     public static void resetJumpResetPairWindowTicks() {
@@ -420,7 +427,7 @@ public class TestModClient implements ClientModInitializer {
                 PvPOverlayConfig.MIN_JUMP_RESET_DISPLAY_TICKS,
                 PvPOverlayConfig.MAX_JUMP_RESET_DISPLAY_TICKS
         );
-        CONFIG.save();
+        saveConfig();
     }
 
     public static void resetJumpResetDisplayTicks() {
@@ -429,15 +436,15 @@ public class TestModClient implements ClientModInitializer {
 
     public static void cycleJumpResetUnitMode() {
         CONFIG.jumpResetUnitMode = switch (CONFIG.jumpResetUnitMode) {
-            case 3 -> 0; // None -> T
-            case 0 -> 4; // T -> t
-            case 4 -> 2; // t -> Ticks
-            case 2 -> 1; // Ticks -> ticks
-            case 1 -> 3; // ticks -> None
+            case 3 -> 0;
+            case 0 -> 4;
+            case 4 -> 2;
+            case 2 -> 1;
+            case 1 -> 3;
             default -> 0;
         };
 
-        CONFIG.save();
+        saveConfig();
     }
 
     public static void setJumpResetPerfectColorHex(String value) {
@@ -445,7 +452,7 @@ public class TestModClient implements ClientModInitializer {
                 value,
                 PvPOverlayConfig.DEFAULT_JUMP_RESET_PERFECT_COLOR
         );
-        CONFIG.save();
+        saveConfig();
     }
 
     public static void setJumpResetEarlyColorHex(String value) {
@@ -453,7 +460,7 @@ public class TestModClient implements ClientModInitializer {
                 value,
                 PvPOverlayConfig.DEFAULT_JUMP_RESET_EARLY_COLOR
         );
-        CONFIG.save();
+        saveConfig();
     }
 
     public static void setJumpResetLateColorHex(String value) {
@@ -461,22 +468,22 @@ public class TestModClient implements ClientModInitializer {
                 value,
                 PvPOverlayConfig.DEFAULT_JUMP_RESET_LATE_COLOR
         );
-        CONFIG.save();
+        saveConfig();
     }
 
     public static void resetJumpResetPerfectColor() {
         CONFIG.jumpResetPerfectColor = PvPOverlayConfig.DEFAULT_JUMP_RESET_PERFECT_COLOR;
-        CONFIG.save();
+        saveConfig();
     }
 
     public static void resetJumpResetEarlyColor() {
         CONFIG.jumpResetEarlyColor = PvPOverlayConfig.DEFAULT_JUMP_RESET_EARLY_COLOR;
-        CONFIG.save();
+        saveConfig();
     }
 
     public static void resetJumpResetLateColor() {
         CONFIG.jumpResetLateColor = PvPOverlayConfig.DEFAULT_JUMP_RESET_LATE_COLOR;
-        CONFIG.save();
+        saveConfig();
     }
 
     public static int getForcedOtherPlayerMainHand() {
@@ -490,7 +497,7 @@ public class TestModClient implements ClientModInitializer {
             CONFIG.forcedOtherPlayerMainHand = 0;
         }
 
-        CONFIG.save();
+        saveConfig();
     }
 
     public static Component getForcedOtherPlayerMainHandText() {
@@ -515,7 +522,7 @@ public class TestModClient implements ClientModInitializer {
 
     public static void setConfigMenuOpacityPercent(int percent) {
         CONFIG.configMenuOpacityPercent = clampInt(percent, 0, 100);
-        CONFIG.save();
+        saveConfig();
     }
 
     public static int getConfigMenuBackgroundColor() {
@@ -527,71 +534,331 @@ public class TestModClient implements ClientModInitializer {
         graphics.fill(0, 0, width, height, getConfigMenuBackgroundColor());
     }
 
-    public static void setOverlayPosition(int x, int y) {
-        Minecraft minecraft = Minecraft.getInstance();
+    public static ArrayList<PvPOverlayConfig.OverlayGroupConfig> getOverlayGroups() {
+        CONFIG.ensureEnabledModulesHaveGroups();
+        return CONFIG.overlayGroups;
+    }
 
-        int boxWidth = getOverlayBoxWidth(minecraft);
-        int boxHeight = getOverlayBoxHeight(minecraft);
+    public static PvPOverlayConfig.OverlayGroupConfig findOverlayGroup(String groupId) {
+        return CONFIG.findGroup(groupId);
+    }
 
-        int screenWidth = minecraft.getWindow().getGuiScaledWidth();
-        int screenHeight = minecraft.getWindow().getGuiScaledHeight();
-
-        CONFIG.customPosition = true;
-        CONFIG.overlayX = clampInt(x, 0, Math.max(0, screenWidth - boxWidth));
-        CONFIG.overlayY = clampInt(y, 0, Math.max(0, screenHeight - boxHeight));
+    public static void saveConfig() {
+        CONFIG.clampAndRepair();
+        CONFIG.ensureEnabledModulesHaveGroups();
         CONFIG.save();
+    }
+
+    public static String createLayoutSnapshot() {
+        return new com.google.gson.Gson().toJson(CONFIG.overlayGroups);
+    }
+
+    public static void restoreLayoutSnapshot(String snapshot) {
+        PvPOverlayConfig.OverlayGroupConfig[] groups = new com.google.gson.Gson().fromJson(
+                snapshot,
+                PvPOverlayConfig.OverlayGroupConfig[].class
+        );
+
+        CONFIG.overlayGroups.clear();
+
+        if (groups != null) {
+            for (PvPOverlayConfig.OverlayGroupConfig group : groups) {
+                CONFIG.overlayGroups.add(group);
+            }
+        }
+
+        saveConfig();
+    }
+
+    public static void resetOverlayLayout() {
+        CONFIG.overlayGroups.clear();
+
+        PvPOverlayConfig.OverlayGroupConfig group = PvPOverlayConfig.OverlayGroupConfig.createDefault(
+                "group-main",
+                0,
+                10
+        );
+
+        group.showBox = true;
+        group.modules.add(PvPOverlayConfig.MODULE_HIT);
+        group.modules.add(PvPOverlayConfig.MODULE_TAKEN);
+        group.modules.add(PvPOverlayConfig.MODULE_JUMP_RESET);
+
+        CONFIG.overlayGroups.add(group);
+
+        saveConfig();
+    }
+
+    public static void setOverlayPosition(int x, int y) {
+        ArrayList<PvPOverlayConfig.OverlayGroupConfig> groups = getOverlayGroups();
+
+        if (groups.isEmpty()) {
+            resetOverlayLayout();
+            groups = getOverlayGroups();
+        }
+
+        PvPOverlayConfig.OverlayGroupConfig group = groups.get(0);
+        group.x = x;
+        group.y = y;
+
+        saveConfig();
     }
 
     public static void resetOverlayPosition() {
-        CONFIG.customPosition = false;
-        CONFIG.overlayX = 0;
-        CONFIG.overlayY = 10;
-        CONFIG.save();
+        resetOverlayLayout();
     }
 
     public static int getOverlayX(Minecraft minecraft) {
-        int boxWidth = getOverlayBoxWidth(minecraft);
-        int screenWidth = minecraft.getWindow().getGuiScaledWidth();
+        ArrayList<PvPOverlayConfig.OverlayGroupConfig> groups = getOverlayGroups();
 
-        if (CONFIG.customPosition) {
-            return clampInt(CONFIG.overlayX, 0, Math.max(0, screenWidth - boxWidth));
+        if (groups.isEmpty()) {
+            return 0;
         }
 
-        return (screenWidth - boxWidth) / 2;
+        return groups.get(0).x;
     }
 
     public static int getOverlayY(Minecraft minecraft) {
-        int boxHeight = getOverlayBoxHeight(minecraft);
-        int screenHeight = minecraft.getWindow().getGuiScaledHeight();
+        ArrayList<PvPOverlayConfig.OverlayGroupConfig> groups = getOverlayGroups();
 
-        if (CONFIG.customPosition) {
-            return clampInt(CONFIG.overlayY, 0, Math.max(0, screenHeight - boxHeight));
+        if (groups.isEmpty()) {
+            return 10;
         }
 
-        return 10;
+        return groups.get(0).y;
     }
 
     public static int getOverlayBoxWidth(Minecraft minecraft) {
-        int paddingX = 8;
-        int textWidth = 0;
+        ArrayList<PvPOverlayConfig.OverlayGroupConfig> groups = getOverlayGroups();
 
-        if (CONFIG.showHit) {
-            textWidth = Math.max(textWidth, minecraft.font.width(hitFullText()));
+        if (groups.isEmpty()) {
+            return 0;
         }
 
-        if (CONFIG.showTaken) {
-            textWidth = Math.max(textWidth, minecraft.font.width(takenFullText()));
+        return getGroupBounds(minecraft, groups.get(0)).width;
+    }
+
+    public static int getOverlayBoxHeight(Minecraft minecraft) {
+        ArrayList<PvPOverlayConfig.OverlayGroupConfig> groups = getOverlayGroups();
+
+        if (groups.isEmpty()) {
+            return 0;
         }
 
-        if (CONFIG.showJumpReset) {
-            textWidth = Math.max(textWidth, getJumpResetStableTextWidth(minecraft));
+        return getGroupBounds(minecraft, groups.get(0)).height;
+    }
+
+    public static void drawOverlay(GuiGraphics graphics, Minecraft minecraft, boolean editorMode) {
+        CONFIG.ensureEnabledModulesHaveGroups();
+
+        boolean playerListOpen = minecraft.options.keyPlayerList.isDown();
+
+        for (PvPOverlayConfig.OverlayGroupConfig group : CONFIG.overlayGroups) {
+            if (!editorMode && group.hideWhenPlayerListOpen && playerListOpen) {
+                continue;
+            }
+
+            drawGroup(graphics, minecraft, group, editorMode, false, null);
+        }
+    }
+
+    public static void drawGroupEditorPreview(
+            GuiGraphics graphics,
+            Minecraft minecraft,
+            PvPOverlayConfig.OverlayGroupConfig group,
+            boolean hovered,
+            String hoveredModule
+    ) {
+        drawGroup(graphics, minecraft, group, true, hovered, hoveredModule);
+    }
+
+    private static void drawGroup(
+            GuiGraphics graphics,
+            Minecraft minecraft,
+            PvPOverlayConfig.OverlayGroupConfig group,
+            boolean editorMode,
+            boolean hovered,
+            String hoveredModule
+    ) {
+        OverlayGroupBounds bounds = getGroupBounds(minecraft, group);
+
+        if (bounds.visibleModules.isEmpty()) {
+            return;
         }
 
-        if (textWidth == 0) {
-            textWidth = minecraft.font.width(Component.translatable("overlay.pvp-overlay.title").getString());
+        if (group.showBox) {
+            int bgColor = PvPOverlayConfig.colorWithOpacity(
+                    group.backgroundColor,
+                    group.backgroundOpacityPercent,
+                    0xFF000000
+            );
+
+            graphics.fill(
+                    bounds.x,
+                    bounds.y,
+                    bounds.x + bounds.width,
+                    bounds.y + bounds.height,
+                    bgColor
+            );
         }
 
-        return textWidth + paddingX * 2;
+        if (group.showBorder || editorMode) {
+            int borderColor;
+
+            if (editorMode && hovered) {
+                borderColor = 0xFF55AAFF;
+            } else {
+                borderColor = PvPOverlayConfig.colorWithOpacity(
+                        group.borderColor,
+                        group.borderOpacityPercent,
+                        0xFFFFFFFF
+                );
+            }
+
+            graphics.renderOutline(bounds.x, bounds.y, bounds.width, bounds.height, borderColor);
+        }
+
+        for (OverlayModuleRow row : bounds.rows) {
+            if (editorMode && row.moduleId.equals(hoveredModule)) {
+                graphics.renderOutline(
+                        row.x - 2,
+                        row.y - 2,
+                        row.width + 4,
+                        row.height + 4,
+                        0xFFFFFF55
+                );
+            }
+
+            drawModuleText(graphics, minecraft, row.moduleId, row.x, row.y);
+        }
+    }
+
+    private static void drawModuleText(GuiGraphics graphics, Minecraft minecraft, String moduleId, int x, int y) {
+        switch (moduleId) {
+            case PvPOverlayConfig.MODULE_HIT -> drawDistanceLine(
+                    graphics,
+                    minecraft,
+                    x,
+                    y,
+                    Component.translatable("overlay.pvp-overlay.hit").getString() + ": ",
+                    hitMainText,
+                    hitRoundedDigit,
+                    " " + Component.translatable("overlay.pvp-overlay.blocks").getString()
+            );
+            case PvPOverlayConfig.MODULE_TAKEN -> drawDistanceLine(
+                    graphics,
+                    minecraft,
+                    x,
+                    y,
+                    Component.translatable("overlay.pvp-overlay.taken").getString() + ": ",
+                    takenMainText,
+                    takenRoundedDigit,
+                    " " + Component.translatable("overlay.pvp-overlay.blocks").getString()
+            );
+            case PvPOverlayConfig.MODULE_JUMP_RESET -> drawSimpleLine(
+                    graphics,
+                    minecraft,
+                    x,
+                    y,
+                    Component.translatable("overlay.pvp-overlay.jump_reset").getString() + ": ",
+                    jumpResetText,
+                    jumpResetColor
+            );
+        }
+    }
+
+    public static OverlayGroupBounds getGroupBounds(Minecraft minecraft, PvPOverlayConfig.OverlayGroupConfig group) {
+        group.repair();
+
+        ArrayList<String> visibleModules = getVisibleModules(group);
+
+        int fontHeight = minecraft.font.lineHeight;
+        int maxWidth = 0;
+
+        ArrayList<OverlayModuleRow> rows = new ArrayList<>();
+
+        int contentX = group.x + group.paddingX;
+        int contentY = group.y + group.paddingY;
+
+        int y = contentY;
+
+        for (String moduleId : visibleModules) {
+            int width = getModuleTextWidth(minecraft, moduleId);
+
+            rows.add(new OverlayModuleRow(
+                    moduleId,
+                    contentX,
+                    y,
+                    width,
+                    fontHeight
+            ));
+
+            maxWidth = Math.max(maxWidth, width);
+            y += fontHeight + group.lineGap;
+        }
+
+        int contentHeight = visibleModules.isEmpty()
+                ? 0
+                : visibleModules.size() * fontHeight + Math.max(0, visibleModules.size() - 1) * group.lineGap;
+
+        int width = maxWidth + group.paddingX * 2;
+        int height = contentHeight + group.paddingY * 2;
+
+        return new OverlayGroupBounds(
+                group.id,
+                group.x,
+                group.y,
+                width,
+                height,
+                visibleModules,
+                rows
+        );
+    }
+
+    private static ArrayList<String> getVisibleModules(PvPOverlayConfig.OverlayGroupConfig group) {
+        ArrayList<String> visibleModules = new ArrayList<>();
+
+        if (group.modules == null) {
+            return visibleModules;
+        }
+
+        for (String moduleId : group.modules) {
+            if (isModuleVisible(moduleId)) {
+                visibleModules.add(moduleId);
+            }
+        }
+
+        return visibleModules;
+    }
+
+    private static boolean isModuleVisible(String moduleId) {
+        return switch (moduleId) {
+            case PvPOverlayConfig.MODULE_HIT -> CONFIG.showHit;
+            case PvPOverlayConfig.MODULE_TAKEN -> CONFIG.showTaken;
+            case PvPOverlayConfig.MODULE_JUMP_RESET -> CONFIG.showJumpReset;
+            default -> false;
+        };
+    }
+
+    public static String getModuleDisplayName(String moduleId) {
+        return switch (moduleId) {
+            case PvPOverlayConfig.MODULE_HIT -> Component.translatable("overlay.pvp-overlay.hit").getString();
+            case PvPOverlayConfig.MODULE_TAKEN -> Component.translatable("overlay.pvp-overlay.taken").getString();
+            case PvPOverlayConfig.MODULE_JUMP_RESET -> Component.translatable("overlay.pvp-overlay.jump_reset").getString();
+            default -> moduleId;
+        };
+    }
+
+    private static int getModuleTextWidth(Minecraft minecraft, String moduleId) {
+        return switch (moduleId) {
+            case PvPOverlayConfig.MODULE_HIT -> minecraft.font.width(hitFullText());
+            case PvPOverlayConfig.MODULE_TAKEN -> minecraft.font.width(takenFullText());
+            case PvPOverlayConfig.MODULE_JUMP_RESET -> Math.max(
+                    minecraft.font.width(jumpResetFullText()),
+                    getJumpResetStableTextWidth(minecraft)
+            );
+            default -> 0;
+        };
     }
 
     private static int getJumpResetStableTextWidth(Minecraft minecraft) {
@@ -611,111 +878,238 @@ public class TestModClient implements ClientModInitializer {
         return width;
     }
 
-    public static int getOverlayBoxHeight(Minecraft minecraft) {
-        int paddingY = 8;
-        int lineGap = 3;
-        int fontHeight = minecraft.font.lineHeight;
+    public static void moveModuleToNewGroup(String moduleId, int x, int y) {
+        removeModuleFromAllGroups(moduleId);
 
-        int visibleLines = getVisibleLineCount();
+        PvPOverlayConfig.OverlayGroupConfig group = PvPOverlayConfig.OverlayGroupConfig.createDefault(
+                "group-" + moduleId + "-" + System.currentTimeMillis(),
+                x,
+                y
+        );
 
-        if (visibleLines == 0) {
-            visibleLines = 1;
-        }
+        group.showBox = false;
+        group.modules.add(moduleId);
 
-        int contentHeight = visibleLines * fontHeight + Math.max(0, visibleLines - 1) * lineGap;
+        CONFIG.overlayGroups.add(group);
 
-        return contentHeight + paddingY * 2;
+        saveConfig();
     }
 
-    public static void drawOverlay(GuiGraphics graphics, Minecraft minecraft) {
-        String hitPrefix = Component.translatable("overlay.pvp-overlay.hit").getString() + ": ";
-        String takenPrefix = Component.translatable("overlay.pvp-overlay.taken").getString() + ": ";
-        String jumpResetPrefix = Component.translatable("overlay.pvp-overlay.jump_reset").getString() + ": ";
-        String suffix = " " + Component.translatable("overlay.pvp-overlay.blocks").getString();
+    public static void moveModuleToGroup(String moduleId, String targetGroupId, int insertIndex) {
+        PvPOverlayConfig.OverlayGroupConfig target = CONFIG.findGroup(targetGroupId);
 
-        int paddingX = 8;
-        int paddingY = 8;
-        int lineGap = 3;
-        int fontHeight = minecraft.font.lineHeight;
-
-        int visibleLines = getVisibleLineCount();
-
-        if (visibleLines == 0) {
+        if (target == null) {
             return;
         }
 
-        int contentHeight = visibleLines * fontHeight + Math.max(0, visibleLines - 1) * lineGap;
-        int boxWidth = getOverlayBoxWidth(minecraft);
-        int boxHeight = contentHeight + paddingY * 2;
+        removeModuleFromAllGroups(moduleId);
 
-        int x = getOverlayX(minecraft);
-        int y = getOverlayY(minecraft);
+        insertIndex = clampInt(insertIndex, 0, target.modules.size());
 
-        graphics.fill(x, y, x + boxWidth, y + boxHeight, 0xAA000000);
-        graphics.renderOutline(x, y, boxWidth, boxHeight, 0xFFFFFFFF);
+        target.modules.add(insertIndex, moduleId);
 
-        int textX = x + paddingX;
-        int textY = y + (boxHeight - contentHeight) / 2;
+        saveConfig();
+    }
 
-        if (CONFIG.showHit) {
-            drawDistanceLine(
-                    graphics,
-                    minecraft,
-                    textX,
-                    textY,
-                    hitPrefix,
-                    hitMainText,
-                    hitRoundedDigit,
-                    suffix
-            );
+    public static void removeModuleFromGroupToNewGroup(String moduleId, String groupId) {
+        PvPOverlayConfig.OverlayGroupConfig group = CONFIG.findGroup(groupId);
 
-            textY += fontHeight + lineGap;
+        if (group == null || group.modules == null || !group.modules.contains(moduleId)) {
+            return;
         }
 
-        if (CONFIG.showTaken) {
-            drawDistanceLine(
-                    graphics,
-                    minecraft,
-                    textX,
-                    textY,
-                    takenPrefix,
-                    takenMainText,
-                    takenRoundedDigit,
-                    suffix
-            );
+        int x = group.x + 16;
+        int y = group.y + 16;
 
-            textY += fontHeight + lineGap;
+        group.modules.remove(moduleId);
+        CONFIG.removeEmptyGroups();
+
+        PvPOverlayConfig.OverlayGroupConfig newGroup = PvPOverlayConfig.OverlayGroupConfig.createDefault(
+                "group-" + moduleId + "-" + System.currentTimeMillis(),
+                x,
+                y
+        );
+
+        newGroup.showBox = false;
+        newGroup.modules.add(moduleId);
+        CONFIG.overlayGroups.add(newGroup);
+
+        saveConfig();
+    }
+
+    private static void removeModuleFromAllGroups(String moduleId) {
+        for (PvPOverlayConfig.OverlayGroupConfig group : CONFIG.overlayGroups) {
+            if (group.modules != null) {
+                group.modules.remove(moduleId);
+            }
         }
 
-        if (CONFIG.showJumpReset) {
-            drawSimpleLine(
-                    graphics,
-                    minecraft,
-                    textX,
-                    textY,
-                    jumpResetPrefix,
-                    jumpResetText,
-                    jumpResetColor
+        CONFIG.removeEmptyGroups();
+    }
+
+    public static void moveModuleUp(String groupId, String moduleId) {
+        PvPOverlayConfig.OverlayGroupConfig group = CONFIG.findGroup(groupId);
+
+        if (group == null || group.modules == null) {
+            return;
+        }
+
+        int index = group.modules.indexOf(moduleId);
+
+        if (index <= 0) {
+            return;
+        }
+
+        group.modules.remove(index);
+        group.modules.add(index - 1, moduleId);
+
+        saveConfig();
+    }
+
+    public static void moveModuleDown(String groupId, String moduleId) {
+        PvPOverlayConfig.OverlayGroupConfig group = CONFIG.findGroup(groupId);
+
+        if (group == null || group.modules == null) {
+            return;
+        }
+
+        int index = group.modules.indexOf(moduleId);
+
+        if (index < 0 || index >= group.modules.size() - 1) {
+            return;
+        }
+
+        group.modules.remove(index);
+        group.modules.add(index + 1, moduleId);
+
+        saveConfig();
+    }
+
+    public static void ungroupAll(String groupId) {
+        PvPOverlayConfig.OverlayGroupConfig group = CONFIG.findGroup(groupId);
+
+        if (group == null || group.modules == null || group.modules.size() <= 1) {
+            return;
+        }
+
+        ArrayList<String> modules = new ArrayList<>(group.modules);
+        int startX = group.x;
+        int startY = group.y;
+
+        CONFIG.overlayGroups.remove(group);
+
+        for (int i = 0; i < modules.size(); i++) {
+            PvPOverlayConfig.OverlayGroupConfig newGroup = PvPOverlayConfig.OverlayGroupConfig.createDefault(
+                    "group-" + modules.get(i) + "-" + System.currentTimeMillis() + "-" + i,
+                    startX,
+                    startY + i * 24
             );
+
+            newGroup.showBox = false;
+            newGroup.modules.add(modules.get(i));
+            CONFIG.overlayGroups.add(newGroup);
+        }
+
+        saveConfig();
+    }
+
+    public static void setGroupShowBox(String groupId, boolean value) {
+        PvPOverlayConfig.OverlayGroupConfig group = CONFIG.findGroup(groupId);
+
+        if (group != null) {
+            group.showBox = value;
+            saveConfig();
         }
     }
 
-    private static int getVisibleLineCount() {
-        int visibleLines = 0;
+    public static void setGroupShowBorder(String groupId, boolean value) {
+        PvPOverlayConfig.OverlayGroupConfig group = CONFIG.findGroup(groupId);
 
-        if (CONFIG.showHit) {
-            visibleLines++;
+        if (group != null) {
+            group.showBorder = value;
+            saveConfig();
         }
+    }
 
-        if (CONFIG.showTaken) {
-            visibleLines++;
+    public static void setGroupHideWhenPlayerListOpen(String groupId, boolean value) {
+        PvPOverlayConfig.OverlayGroupConfig group = CONFIG.findGroup(groupId);
+
+        if (group != null) {
+            group.hideWhenPlayerListOpen = value;
+            saveConfig();
         }
+    }
 
-        if (CONFIG.showJumpReset) {
-            visibleLines++;
+    public static void setGroupBackgroundColor(String groupId, String value) {
+        PvPOverlayConfig.OverlayGroupConfig group = CONFIG.findGroup(groupId);
+
+        if (group != null) {
+            group.backgroundColor = PvPOverlayConfig.normalizeColorHex(value, PvPOverlayConfig.DEFAULT_GROUP_BACKGROUND_COLOR);
+            saveConfig();
         }
+    }
 
-        return visibleLines;
+    public static void setGroupBorderColor(String groupId, String value) {
+        PvPOverlayConfig.OverlayGroupConfig group = CONFIG.findGroup(groupId);
+
+        if (group != null) {
+            group.borderColor = PvPOverlayConfig.normalizeColorHex(value, PvPOverlayConfig.DEFAULT_GROUP_BORDER_COLOR);
+            saveConfig();
+        }
+    }
+
+    public static void setGroupBackgroundOpacityPercent(String groupId, int percent) {
+        PvPOverlayConfig.OverlayGroupConfig group = CONFIG.findGroup(groupId);
+
+        if (group != null) {
+            group.backgroundOpacityPercent = clampInt(percent, 0, 100);
+            saveConfig();
+        }
+    }
+
+    public static void setGroupBorderOpacityPercent(String groupId, int percent) {
+        PvPOverlayConfig.OverlayGroupConfig group = CONFIG.findGroup(groupId);
+
+        if (group != null) {
+            group.borderOpacityPercent = clampInt(percent, 0, 100);
+            saveConfig();
+        }
+    }
+
+    public static void setGroupPaddingX(String groupId, int value) {
+        PvPOverlayConfig.OverlayGroupConfig group = CONFIG.findGroup(groupId);
+
+        if (group != null) {
+            group.paddingX = clampInt(value, 0, 32);
+            saveConfig();
+        }
+    }
+
+    public static void setGroupPaddingY(String groupId, int value) {
+        PvPOverlayConfig.OverlayGroupConfig group = CONFIG.findGroup(groupId);
+
+        if (group != null) {
+            group.paddingY = clampInt(value, 0, 32);
+            saveConfig();
+        }
+    }
+
+    public static void setGroupLineGap(String groupId, int value) {
+        PvPOverlayConfig.OverlayGroupConfig group = CONFIG.findGroup(groupId);
+
+        if (group != null) {
+            group.lineGap = clampInt(value, 0, 20);
+            saveConfig();
+        }
+    }
+
+    public static void setGroupScalePercent(String groupId, int value) {
+        PvPOverlayConfig.OverlayGroupConfig group = CONFIG.findGroup(groupId);
+
+        if (group != null) {
+            group.scalePercent = clampInt(value, 50, 200);
+            saveConfig();
+        }
     }
 
     private static String hitFullText() {
@@ -812,47 +1206,16 @@ public class TestModClient implements ClientModInitializer {
     ) {
         int textX = x;
 
-        graphics.drawString(
-                minecraft.font,
-                prefix,
-                textX,
-                y,
-                0xFFFFFFFF,
-                false
-        );
-
+        graphics.drawString(minecraft.font, prefix, textX, y, 0xFFFFFFFF, false);
         textX += minecraft.font.width(prefix);
 
-        graphics.drawString(
-                minecraft.font,
-                mainText,
-                textX,
-                y,
-                0xFFFFFFFF,
-                false
-        );
-
+        graphics.drawString(minecraft.font, mainText, textX, y, 0xFFFFFFFF, false);
         textX += minecraft.font.width(mainText);
 
-        graphics.drawString(
-                minecraft.font,
-                roundedDigit,
-                textX,
-                y,
-                0xFF888888,
-                false
-        );
-
+        graphics.drawString(minecraft.font, roundedDigit, textX, y, 0xFF888888, false);
         textX += minecraft.font.width(roundedDigit);
 
-        graphics.drawString(
-                minecraft.font,
-                suffix,
-                textX,
-                y,
-                0xFFFFFFFF,
-                false
-        );
+        graphics.drawString(minecraft.font, suffix, textX, y, 0xFFFFFFFF, false);
     }
 
     private static void drawSimpleLine(
@@ -866,24 +1229,41 @@ public class TestModClient implements ClientModInitializer {
     ) {
         int textX = x;
 
-        graphics.drawString(
-                minecraft.font,
-                prefix,
-                textX,
-                y,
-                0xFFFFFFFF,
-                false
-        );
-
+        graphics.drawString(minecraft.font, prefix, textX, y, 0xFFFFFFFF, false);
         textX += minecraft.font.width(prefix);
 
-        graphics.drawString(
-                minecraft.font,
-                value,
-                textX,
-                y,
-                valueColor,
-                false
-        );
+        graphics.drawString(minecraft.font, value, textX, y, valueColor, false);
+    }
+
+    public record OverlayGroupBounds(
+            String groupId,
+            int x,
+            int y,
+            int width,
+            int height,
+            ArrayList<String> visibleModules,
+            ArrayList<OverlayModuleRow> rows
+    ) {
+        public boolean contains(double mouseX, double mouseY) {
+            return mouseX >= x &&
+                    mouseX <= x + width &&
+                    mouseY >= y &&
+                    mouseY <= y + height;
+        }
+    }
+
+    public record OverlayModuleRow(
+            String moduleId,
+            int x,
+            int y,
+            int width,
+            int height
+    ) {
+        public boolean contains(double mouseX, double mouseY) {
+            return mouseX >= x &&
+                    mouseX <= x + width &&
+                    mouseY >= y &&
+                    mouseY <= y + height;
+        }
     }
 }
