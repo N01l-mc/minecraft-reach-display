@@ -16,7 +16,12 @@ public class PvPOverlayPositionScreen extends Screen {
     private static final int SNAP_DISTANCE = 8;
     private static final int CONTEXT_ITEM_HEIGHT = 18;
     private static final int CONTEXT_WIDTH = 150;
+
     private static final int DONE_BUTTON_WIDTH = 200;
+    private static final int UNDO_BUTTON_WIDTH = 96;
+    private static final int BOTTOM_BUTTON_HEIGHT = 20;
+    private static final int BOTTOM_MARGIN = 24;
+    private static final int CORNER_MARGIN = 8;
 
     private final Screen parent;
 
@@ -29,8 +34,6 @@ public class PvPOverlayPositionScreen extends Screen {
 
     private String targetGroupId = null;
     private int targetInsertIndex = 0;
-
-    private boolean previousUndoShortcutDown = false;
 
     private ContextMenu contextMenu = null;
 
@@ -50,18 +53,27 @@ public class PvPOverlayPositionScreen extends Screen {
                 button -> Minecraft.getInstance().setScreen(parent)
         ).bounds(
                 this.width / 2 - DONE_BUTTON_WIDTH / 2,
-                this.height - 24,
+                this.height - BOTTOM_MARGIN,
                 DONE_BUTTON_WIDTH,
-                20
+                BOTTOM_BUTTON_HEIGHT
+        ).build();
+
+        Button undoButton = Button.builder(
+                Component.translatable("button.pvp-overlay.undo"),
+                button -> undoLastAction()
+        ).bounds(
+                this.width - UNDO_BUTTON_WIDTH - CORNER_MARGIN,
+                this.height - BOTTOM_MARGIN,
+                UNDO_BUTTON_WIDTH,
+                BOTTOM_BUTTON_HEIGHT
         ).build();
 
         this.addRenderableWidget(doneButton);
+        this.addRenderableWidget(undoButton);
     }
 
     @Override
     public void render(GuiGraphics graphics, int mouseX, int mouseY, float delta) {
-        pollUndoShortcut();
-
         TestModClient.drawConfigMenuBackdrop(graphics, this.width, this.height);
 
         updateHover(mouseX, mouseY);
@@ -123,28 +135,6 @@ public class PvPOverlayPositionScreen extends Screen {
         if (contextMenu != null) {
             drawContextMenu(graphics, mouseX, mouseY);
         }
-    }
-
-    private void pollUndoShortcut() {
-        long window = GLFW.glfwGetCurrentContext();
-
-        if (window == 0L) {
-            previousUndoShortcutDown = false;
-            return;
-        }
-
-        boolean ctrlDown =
-                GLFW.glfwGetKey(window, GLFW.GLFW_KEY_LEFT_CONTROL) == GLFW.GLFW_PRESS ||
-                        GLFW.glfwGetKey(window, GLFW.GLFW_KEY_RIGHT_CONTROL) == GLFW.GLFW_PRESS;
-
-        boolean zDown = GLFW.glfwGetKey(window, GLFW.GLFW_KEY_Z) == GLFW.GLFW_PRESS;
-        boolean shortcutDown = ctrlDown && zDown;
-
-        if (shortcutDown && !previousUndoShortcutDown) {
-            undoLastAction();
-        }
-
-        previousUndoShortcutDown = shortcutDown;
     }
 
     private void drawWrappedCenteredText(

@@ -15,7 +15,7 @@
 
   "screen.pvp-overlay.config.title": "PvP Overlay Config",
   "screen.pvp-overlay.position.title": "Edit PvP Overlay Layout",
-  "screen.pvp-overlay.position.instructions": "Drag groups with the left mouse button. Drag groups onto each other to group them. Ctrl+Z undoes the last action.",
+  "screen.pvp-overlay.position.instructions": "Drag groups with the left mouse button. Drag groups onto each other to group them. Use Undo to revert the last action.",
   "screen.pvp-overlay.position.right_click_options": "Right click for options",
   "screen.pvp-overlay.jump_reset_config.title": "Jump Reset Config",
   "screen.pvp-overlay.jump_reset_config.description": "Configure the Jump Reset module.",
@@ -55,6 +55,7 @@
   "button.pvp-overlay.reset_position": "Reset Position",
   "button.pvp-overlay.done": "Done",
   "button.pvp-overlay.reset": "Reset",
+  "button.pvp-overlay.undo": "Undo",
   "button.pvp-overlay.ok": "OK",
   "button.pvp-overlay.cancel": "Cancel",
   "button.pvp-overlay.group_show_box": "Show Box",
