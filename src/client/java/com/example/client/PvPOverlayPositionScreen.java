@@ -2,6 +2,7 @@ package com.example.client;
 
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.GuiGraphics;
+import net.minecraft.client.gui.components.Button;
 import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.client.input.KeyEvent;
 import net.minecraft.client.input.MouseButtonEvent;
@@ -15,6 +16,7 @@ public class PvPOverlayPositionScreen extends Screen {
     private static final int SNAP_DISTANCE = 8;
     private static final int CONTEXT_ITEM_HEIGHT = 18;
     private static final int CONTEXT_WIDTH = 150;
+    private static final int DONE_BUTTON_WIDTH = 200;
 
     private final Screen parent;
 
@@ -26,6 +28,9 @@ public class PvPOverlayPositionScreen extends Screen {
     private String hoveredModuleId = null;
 
     private String targetGroupId = null;
+    private int targetInsertIndex = 0;
+
+    private boolean previousUndoShortcutDown = false;
 
     private ContextMenu contextMenu = null;
 
@@ -39,17 +44,31 @@ public class PvPOverlayPositionScreen extends Screen {
     @Override
     protected void init() {
         this.clearWidgets();
+
+        Button doneButton = Button.builder(
+                Component.translatable("button.pvp-overlay.done"),
+                button -> Minecraft.getInstance().setScreen(parent)
+        ).bounds(
+                this.width / 2 - DONE_BUTTON_WIDTH / 2,
+                this.height - 24,
+                DONE_BUTTON_WIDTH,
+                20
+        ).build();
+
+        this.addRenderableWidget(doneButton);
     }
 
     @Override
     public void render(GuiGraphics graphics, int mouseX, int mouseY, float delta) {
+        pollUndoShortcut();
+
         TestModClient.drawConfigMenuBackdrop(graphics, this.width, this.height);
 
         updateHover(mouseX, mouseY);
 
         Minecraft minecraft = Minecraft.getInstance();
 
-        targetGroupId = findSnapTarget(mouseX, mouseY);
+        findSnapTarget(mouseX, mouseY);
 
         for (PvPOverlayConfig.OverlayGroupConfig group : TestModClient.getOverlayGroups()) {
             boolean hovered = group.id.equals(hoveredGroupId);
@@ -67,6 +86,8 @@ public class PvPOverlayPositionScreen extends Screen {
                         bounds.height() + SNAP_DISTANCE * 2,
                         0xFF55FF55
                 );
+
+                drawInsertLine(graphics, bounds, targetInsertIndex);
             }
         }
 
@@ -78,11 +99,12 @@ public class PvPOverlayPositionScreen extends Screen {
                 0xFFFFFFFF
         );
 
-        graphics.drawCenteredString(
-                this.font,
-                Component.translatable("screen.pvp-overlay.position.instructions"),
+        drawWrappedCenteredText(
+                graphics,
+                Component.translatable("screen.pvp-overlay.position.instructions").getString(),
                 this.width / 2,
                 24,
+                Math.max(120, this.width - 24),
                 0xFFAAAAAA
         );
 
@@ -91,16 +113,118 @@ public class PvPOverlayPositionScreen extends Screen {
                     this.font,
                     Component.translatable("screen.pvp-overlay.position.right_click_options"),
                     this.width / 2,
-                    this.height - 28,
+                    this.height - 48,
                     0xFFFFFF55
             );
         }
 
+        super.render(graphics, mouseX, mouseY, delta);
+
         if (contextMenu != null) {
             drawContextMenu(graphics, mouseX, mouseY);
         }
+    }
 
-        super.render(graphics, mouseX, mouseY, delta);
+    private void pollUndoShortcut() {
+        long window = GLFW.glfwGetCurrentContext();
+
+        if (window == 0L) {
+            previousUndoShortcutDown = false;
+            return;
+        }
+
+        boolean ctrlDown =
+                GLFW.glfwGetKey(window, GLFW.GLFW_KEY_LEFT_CONTROL) == GLFW.GLFW_PRESS ||
+                        GLFW.glfwGetKey(window, GLFW.GLFW_KEY_RIGHT_CONTROL) == GLFW.GLFW_PRESS;
+
+        boolean zDown = GLFW.glfwGetKey(window, GLFW.GLFW_KEY_Z) == GLFW.GLFW_PRESS;
+        boolean shortcutDown = ctrlDown && zDown;
+
+        if (shortcutDown && !previousUndoShortcutDown) {
+            undoLastAction();
+        }
+
+        previousUndoShortcutDown = shortcutDown;
+    }
+
+    private void drawWrappedCenteredText(
+            GuiGraphics graphics,
+            String text,
+            int centerX,
+            int y,
+            int maxWidth,
+            int color
+    ) {
+        ArrayList<String> lines = wrapText(text, maxWidth);
+
+        for (int i = 0; i < lines.size(); i++) {
+            graphics.drawCenteredString(
+                    this.font,
+                    lines.get(i),
+                    centerX,
+                    y + i * (this.font.lineHeight + 2),
+                    color
+            );
+        }
+    }
+
+    private ArrayList<String> wrapText(String text, int maxWidth) {
+        ArrayList<String> lines = new ArrayList<>();
+
+        String[] words = text.split(" ");
+        StringBuilder currentLine = new StringBuilder();
+
+        for (String word : words) {
+            if (word.isBlank()) {
+                continue;
+            }
+
+            String candidate = currentLine.isEmpty()
+                    ? word
+                    : currentLine + " " + word;
+
+            if (this.font.width(candidate) <= maxWidth) {
+                currentLine.setLength(0);
+                currentLine.append(candidate);
+                continue;
+            }
+
+            if (!currentLine.isEmpty()) {
+                lines.add(currentLine.toString());
+                currentLine.setLength(0);
+            }
+
+            if (this.font.width(word) <= maxWidth) {
+                currentLine.append(word);
+            } else {
+                lines.add(word);
+            }
+        }
+
+        if (!currentLine.isEmpty()) {
+            lines.add(currentLine.toString());
+        }
+
+        return lines;
+    }
+
+    private void drawInsertLine(GuiGraphics graphics, TestModClient.OverlayGroupBounds bounds, int insertIndex) {
+        int lineY;
+
+        if (bounds.rows().isEmpty()) {
+            lineY = bounds.y() + bounds.height() / 2;
+        } else if (insertIndex <= 0) {
+            TestModClient.OverlayModuleRow first = bounds.rows().get(0);
+            lineY = first.y() - 4;
+        } else if (insertIndex >= bounds.rows().size()) {
+            TestModClient.OverlayModuleRow last = bounds.rows().get(bounds.rows().size() - 1);
+            lineY = last.y() + last.height() + 4;
+        } else {
+            TestModClient.OverlayModuleRow row = bounds.rows().get(insertIndex);
+            lineY = row.y() - 4;
+        }
+
+        graphics.fill(bounds.x() + 3, lineY, bounds.x() + bounds.width() - 3, lineY + 2, 0xFF55FF55);
     }
 
     private void updateHover(double mouseX, double mouseY) {
@@ -132,9 +256,12 @@ public class PvPOverlayPositionScreen extends Screen {
         }
     }
 
-    private String findSnapTarget(double mouseX, double mouseY) {
+    private void findSnapTarget(double mouseX, double mouseY) {
+        targetGroupId = null;
+        targetInsertIndex = 0;
+
         if (draggingGroupId == null) {
-            return null;
+            return;
         }
 
         Minecraft minecraft = Minecraft.getInstance();
@@ -153,11 +280,28 @@ public class PvPOverlayPositionScreen extends Screen {
                             mouseY <= bounds.y() + bounds.height() + SNAP_DISTANCE;
 
             if (close) {
-                return group.id;
+                targetGroupId = group.id;
+                targetInsertIndex = getInsertIndexForMouse(bounds, mouseY);
+                return;
+            }
+        }
+    }
+
+    private int getInsertIndexForMouse(TestModClient.OverlayGroupBounds bounds, double mouseY) {
+        if (bounds.rows().isEmpty()) {
+            return 0;
+        }
+
+        for (int i = 0; i < bounds.rows().size(); i++) {
+            TestModClient.OverlayModuleRow row = bounds.rows().get(i);
+            int rowMiddle = row.y() + row.height() / 2;
+
+            if (mouseY < rowMiddle) {
+                return i;
             }
         }
 
-        return null;
+        return bounds.rows().size();
     }
 
     @Override
@@ -220,6 +364,7 @@ public class PvPOverlayPositionScreen extends Screen {
             if (group != null) {
                 group.x = (int) click.x() - dragOffsetX;
                 group.y = (int) click.y() - dragOffsetY;
+                TestModClient.clampGroupToScreen(Minecraft.getInstance(), group);
             }
 
             return true;
@@ -237,17 +382,26 @@ public class PvPOverlayPositionScreen extends Screen {
 
                 if (draggingGroup != null && targetGroup != null && draggingGroup.modules != null) {
                     ArrayList<String> movedModules = new ArrayList<>(draggingGroup.modules);
+                    int insertIndex = targetInsertIndex;
 
                     for (String moduleId : movedModules) {
-                        TestModClient.moveModuleToGroup(moduleId, targetGroup.id, targetGroup.modules.size());
+                        TestModClient.moveModuleToGroup(moduleId, targetGroup.id, insertIndex);
+                        insertIndex++;
                     }
                 }
             } else {
+                PvPOverlayConfig.OverlayGroupConfig group = TestModClient.findOverlayGroup(draggingGroupId);
+
+                if (group != null) {
+                    TestModClient.clampGroupToScreen(Minecraft.getInstance(), group);
+                }
+
                 TestModClient.saveConfig();
             }
 
             draggingGroupId = null;
             targetGroupId = null;
+            targetInsertIndex = 0;
 
             return true;
         }
@@ -262,28 +416,12 @@ public class PvPOverlayPositionScreen extends Screen {
             return true;
         }
 
-        if (isCtrlDown() && input.key() == GLFW.GLFW_KEY_Z) {
-            undoLastAction();
-            return true;
-        }
-
         return super.keyPressed(input);
     }
 
     @Override
     public void onClose() {
         Minecraft.getInstance().setScreen(parent);
-    }
-
-    private boolean isCtrlDown() {
-        long window = GLFW.glfwGetCurrentContext();
-
-        if (window == 0L) {
-            return false;
-        }
-
-        return GLFW.glfwGetKey(window, GLFW.GLFW_KEY_LEFT_CONTROL) == GLFW.GLFW_PRESS ||
-                GLFW.glfwGetKey(window, GLFW.GLFW_KEY_RIGHT_CONTROL) == GLFW.GLFW_PRESS;
     }
 
     private void pushUndoSnapshot() {
@@ -344,17 +482,35 @@ public class PvPOverlayPositionScreen extends Screen {
             return false;
         }
 
-        pushUndoSnapshot();
-
         String action = contextMenu.getAction(index);
 
         switch (action) {
             case "group_settings" -> Minecraft.getInstance().setScreen(new OverlayGroupSettingsScreen(this, contextMenu.groupId));
-            case "ungroup_all" -> TestModClient.ungroupAll(contextMenu.groupId);
-            case "move_up" -> TestModClient.moveModuleUp(contextMenu.groupId, contextMenu.moduleId);
-            case "move_down" -> TestModClient.moveModuleDown(contextMenu.groupId, contextMenu.moduleId);
-            case "remove_module" -> TestModClient.removeModuleFromGroupToNewGroup(contextMenu.moduleId, contextMenu.groupId);
-            case "reset_layout" -> TestModClient.resetOverlayLayout();
+            case "ungroup_all" -> {
+                pushUndoSnapshot();
+                TestModClient.ungroupAll(contextMenu.groupId);
+            }
+            case "move_up" -> {
+                pushUndoSnapshot();
+                TestModClient.moveModuleUp(contextMenu.groupId, contextMenu.moduleId);
+            }
+            case "move_down" -> {
+                pushUndoSnapshot();
+                TestModClient.moveModuleDown(contextMenu.groupId, contextMenu.moduleId);
+            }
+            case "remove_module" -> {
+                pushUndoSnapshot();
+                TestModClient.removeModuleFromGroupToNewGroup(contextMenu.moduleId, contextMenu.groupId);
+            }
+            case "reset_layout" -> Minecraft.getInstance().setScreen(new ConfirmActionScreen(
+                    this,
+                    Component.translatable("screen.pvp-overlay.confirm_reset.title"),
+                    Component.translatable("screen.pvp-overlay.confirm_reset.layout"),
+                    () -> {
+                        pushUndoSnapshot();
+                        TestModClient.resetOverlayLayout();
+                    }
+            ));
         }
 
         contextMenu = null;
@@ -375,10 +531,13 @@ public class PvPOverlayPositionScreen extends Screen {
             this.groupId = groupId;
             this.moduleId = moduleId;
 
+            PvPOverlayConfig.OverlayGroupConfig group = TestModClient.findOverlayGroup(groupId);
+            int moduleCount = group == null || group.modules == null ? 0 : group.modules.size();
+
             actions.add("group_settings");
             labels.add(Component.translatable("menu.pvp-overlay.group_settings"));
 
-            if (moduleId != null) {
+            if (moduleId != null && moduleCount > 1) {
                 actions.add("move_up");
                 labels.add(Component.translatable("menu.pvp-overlay.move_up"));
 
@@ -389,8 +548,10 @@ public class PvPOverlayPositionScreen extends Screen {
                 labels.add(Component.translatable("menu.pvp-overlay.remove_from_group"));
             }
 
-            actions.add("ungroup_all");
-            labels.add(Component.translatable("menu.pvp-overlay.ungroup_all"));
+            if (moduleCount > 1) {
+                actions.add("ungroup_all");
+                labels.add(Component.translatable("menu.pvp-overlay.ungroup_all"));
+            }
 
             actions.add("reset_layout");
             labels.add(Component.translatable("menu.pvp-overlay.reset_layout"));

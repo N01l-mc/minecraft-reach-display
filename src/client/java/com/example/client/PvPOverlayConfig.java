@@ -151,7 +151,6 @@ public class PvPOverlayConfig {
         }
 
         Set<String> usedModules = new HashSet<>();
-
         ArrayList<OverlayGroupConfig> repairedGroups = new ArrayList<>();
 
         for (OverlayGroupConfig group : overlayGroups) {
@@ -200,7 +199,8 @@ public class PvPOverlayConfig {
                     customPosition ? overlayY : 10
             );
 
-            group.showBox = true;
+            group.showBox = false;
+            group.showBorder = false;
             group.modules.add(MODULE_HIT);
             group.modules.add(MODULE_TAKEN);
             group.modules.add(MODULE_JUMP_RESET);
@@ -233,6 +233,7 @@ public class PvPOverlayConfig {
         );
 
         group.showBox = false;
+        group.showBorder = false;
         group.modules.add(moduleId);
 
         overlayGroups.add(group);
@@ -355,11 +356,11 @@ public class PvPOverlayConfig {
         public int x = 0;
         public int y = 10;
 
-        public boolean showBox = true;
+        public boolean showBox = false;
         public String backgroundColor = DEFAULT_GROUP_BACKGROUND_COLOR;
         public int backgroundOpacityPercent = 67;
 
-        public boolean showBorder = true;
+        public boolean showBorder = false;
         public String borderColor = DEFAULT_GROUP_BORDER_COLOR;
         public int borderOpacityPercent = 100;
 
@@ -398,8 +399,8 @@ public class PvPOverlayConfig {
 
             paddingX = clampInt(paddingX, 0, 32);
             paddingY = clampInt(paddingY, 0, 32);
-            lineGap = clampInt(lineGap, 0, 20);
 
+            lineGap = clampInt(lineGap, 0, 20);
             scalePercent = clampInt(scalePercent, 50, 200);
 
             if (modules == null) {

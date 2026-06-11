@@ -5,98 +5,165 @@ import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.client.gui.components.Button;
 import net.minecraft.client.gui.components.EditBox;
 import net.minecraft.client.gui.screens.Screen;
+import net.minecraft.client.input.KeyEvent;
 import net.minecraft.client.input.MouseButtonEvent;
 import net.minecraft.network.chat.Component;
 
+import java.awt.Color;
+import java.util.Locale;
+
 public class ColorPickerScreen extends Screen {
     private static final int PICKER_WIDTH = 180;
-    private static final int PICKER_HEIGHT = 120;
-    private static final int HUE_WIDTH = 14;
-    private static final int GAP = 10;
+    private static final int PICKER_HEIGHT = 100;
+
+    private static final int HUE_WIDTH = 12;
+    private static final int HUE_HEIGHT = PICKER_HEIGHT;
+
+    private static final int ALPHA_WIDTH = PICKER_WIDTH;
+    private static final int ALPHA_HEIGHT = 12;
+
+    private static final int PREVIEW_WIDTH = 44;
+    private static final int PREVIEW_HEIGHT = 20;
+
+    private static final int HEX_BOX_WIDTH = 82;
+    private static final int HEX_BOX_HEIGHT = 20;
+
+    private static final int BUTTON_WIDTH = 200;
 
     private static final int PICKER_CELL_SIZE = 6;
     private static final int HUE_CELL_HEIGHT = 4;
-
-    private static final int PICKER_COLUMNS = (PICKER_WIDTH + PICKER_CELL_SIZE - 1) / PICKER_CELL_SIZE;
-    private static final int PICKER_ROWS = (PICKER_HEIGHT + PICKER_CELL_SIZE - 1) / PICKER_CELL_SIZE;
-    private static final int HUE_ROWS = (PICKER_HEIGHT + HUE_CELL_HEIGHT - 1) / HUE_CELL_HEIGHT;
+    private static final int ALPHA_CELL_WIDTH = 4;
+    private static final int CHECKER_SIZE = 4;
 
     private final Screen parent;
-    private final ColorSetter setter;
-
-    private final int[][] pickerColors = new int[PICKER_COLUMNS][PICKER_ROWS];
-    private final int[] hueColors = new int[HUE_ROWS];
+    private final ColorSetter colorSetter;
+    private final ColorAlphaSetter colorAlphaSetter;
+    private final boolean showAlpha;
 
     private float hue = 0.0f;
     private float saturation = 1.0f;
-    private float value = 1.0f;
+    private float brightness = 1.0f;
 
-    private int currentRgb = 0xFFFFFF;
+    private int alphaPercent = 100;
+
     private String currentHex = "#FFFFFF";
-
-    private int cachedHueStep = -1;
-    private boolean hueColorsBuilt = false;
-    private boolean colorDirty = false;
-    private boolean updatingHexInput = false;
+    private int currentRgb = 0xFFFFFF;
 
     private boolean draggingPicker = false;
     private boolean draggingHue = false;
+    private boolean draggingAlpha = false;
+    private boolean colorDirty = false;
 
-    private EditBox hexInput;
+    private int pickerX;
+    private int pickerY;
 
-    public ColorPickerScreen(Screen parent, Component title, String initialHex, ColorSetter setter) {
+    private int hueX;
+    private int hueY;
+
+    private int alphaX;
+    private int alphaY;
+
+    private int selectedRowY;
+    private int previewX;
+    private int previewY;
+
+    private EditBox hexBox;
+
+    public ColorPickerScreen(Screen parent, Component title, String initialColor, ColorSetter colorSetter) {
         super(title);
         this.parent = parent;
-        this.setter = setter;
+        this.colorSetter = colorSetter;
+        this.colorAlphaSetter = null;
+        this.showAlpha = false;
 
-        setFromHex(initialHex);
-        updateCurrentColorCache();
+        setColorFromHex(initialColor, false);
+    }
+
+    public ColorPickerScreen(
+            Screen parent,
+            Component title,
+            String initialColor,
+            int initialAlphaPercent,
+            ColorAlphaSetter colorAlphaSetter
+    ) {
+        super(title);
+        this.parent = parent;
+        this.colorSetter = null;
+        this.colorAlphaSetter = colorAlphaSetter;
+        this.showAlpha = true;
+        this.alphaPercent = PvPOverlayConfig.clampInt(initialAlphaPercent, 0, 100);
+
+        setColorFromHex(initialColor, false);
     }
 
     @Override
     protected void init() {
         int centerX = this.width / 2;
-        int pickerX = getPickerX();
-        int pickerY = getPickerY();
 
-        hexInput = new EditBox(
+        pickerX = centerX - (PICKER_WIDTH + 10 + HUE_WIDTH) / 2;
+        pickerY = 46;
+
+        hueX = pickerX + PICKER_WIDTH + 10;
+        hueY = pickerY;
+
+        alphaX = pickerX;
+        alphaY = pickerY + PICKER_HEIGHT + 10;
+
+        selectedRowY = showAlpha ? alphaY + ALPHA_HEIGHT + 14 : pickerY + PICKER_HEIGHT + 18;
+
+        int selectedLabelWidth = this.font.width(Component.translatable("label.pvp-overlay.color_picker.selected"));
+        int selectedRowWidth = selectedLabelWidth + 6 + HEX_BOX_WIDTH + 8 + PREVIEW_WIDTH;
+
+        int selectedX = centerX - selectedRowWidth / 2;
+        int hexBoxX = selectedX + selectedLabelWidth + 6;
+
+        previewX = hexBoxX + HEX_BOX_WIDTH + 8;
+        previewY = selectedRowY;
+
+        hexBox = new EditBox(
                 this.font,
-                pickerX + 130,
-                pickerY + PICKER_HEIGHT + 12,
-                82,
-                20,
+                hexBoxX,
+                selectedRowY,
+                HEX_BOX_WIDTH,
+                HEX_BOX_HEIGHT,
                 Component.translatable("screen.pvp-overlay.jump_reset_config.color_input")
         );
 
-        hexInput.setMaxLength(7);
-        hexInput.setValue(currentHex);
-        hexInput.setResponder(input -> {
-            if (updatingHexInput) {
-                return;
-            }
-
-            if (PvPOverlayConfig.isValidColorHex(input)) {
-                setFromHex(input);
-                updateCurrentColorCache();
-                colorDirty = true;
+        hexBox.setMaxLength(7);
+        hexBox.setValue(currentHex);
+        hexBox.setResponder(value -> {
+            if (PvPOverlayConfig.isValidColorHex(value)) {
+                setColorFromHex(value, true);
             }
         });
+
+        this.addRenderableWidget(hexBox);
 
         Button doneButton = Button.builder(
                 Component.translatable("button.pvp-overlay.done"),
                 button -> {
-                    commitColorIfDirty();
+                    applyIfDirty();
                     Minecraft.getInstance().setScreen(parent);
                 }
-        ).bounds(centerX - 100, this.height - 28, 200, 20).build();
+        ).bounds(centerX - BUTTON_WIDTH / 2, selectedRowY + 30, BUTTON_WIDTH, 20).build();
 
-        this.addRenderableWidget(hexInput);
         this.addRenderableWidget(doneButton);
     }
 
     @Override
+    public boolean keyPressed(KeyEvent input) {
+        if (TestModClient.isOpenConfigKey(input)) {
+            applyIfDirty();
+            Minecraft.getInstance().setScreen(parent);
+            return true;
+        }
+
+        return super.keyPressed(input);
+    }
+
+    @Override
     public void onClose() {
-        commitColorIfDirty();
+        applyIfDirty();
         Minecraft.getInstance().setScreen(parent);
     }
 
@@ -105,20 +172,21 @@ public class ColorPickerScreen extends Screen {
         double mouseX = click.x();
         double mouseY = click.y();
 
-        int pickerX = getPickerX();
-        int pickerY = getPickerY();
-        int hueX = getHueX();
-        int hueY = getPickerY();
-
         if (isInside(mouseX, mouseY, pickerX, pickerY, PICKER_WIDTH, PICKER_HEIGHT)) {
             draggingPicker = true;
-            updateSaturationValue(mouseX, mouseY);
+            updatePicker(mouseX, mouseY);
             return true;
         }
 
-        if (isInside(mouseX, mouseY, hueX, hueY, HUE_WIDTH, PICKER_HEIGHT)) {
+        if (isInside(mouseX, mouseY, hueX, hueY, HUE_WIDTH, HUE_HEIGHT)) {
             draggingHue = true;
             updateHue(mouseY);
+            return true;
+        }
+
+        if (showAlpha && isInside(mouseX, mouseY, alphaX, alphaY, ALPHA_WIDTH, ALPHA_HEIGHT)) {
+            draggingAlpha = true;
+            updateAlpha(mouseX);
             return true;
         }
 
@@ -127,16 +195,18 @@ public class ColorPickerScreen extends Screen {
 
     @Override
     public boolean mouseDragged(MouseButtonEvent click, double dragX, double dragY) {
-        double mouseX = click.x();
-        double mouseY = click.y();
-
         if (draggingPicker) {
-            updateSaturationValue(mouseX, mouseY);
+            updatePicker(click.x(), click.y());
             return true;
         }
 
         if (draggingHue) {
-            updateHue(mouseY);
+            updateHue(click.y());
+            return true;
+        }
+
+        if (draggingAlpha) {
+            updateAlpha(click.x());
             return true;
         }
 
@@ -145,15 +215,15 @@ public class ColorPickerScreen extends Screen {
 
     @Override
     public boolean mouseReleased(MouseButtonEvent click) {
-        boolean wasDragging = draggingPicker || draggingHue;
-
-        draggingPicker = false;
-        draggingHue = false;
-
-        if (wasDragging) {
-            commitColorIfDirty();
+        if (draggingPicker || draggingHue || draggingAlpha) {
+            draggingPicker = false;
+            draggingHue = false;
+            draggingAlpha = false;
+            applyIfDirty();
             return true;
         }
+
+        applyIfDirty();
 
         return super.mouseReleased(click);
     }
@@ -166,293 +236,255 @@ public class ColorPickerScreen extends Screen {
                 this.font,
                 this.title,
                 this.width / 2,
-                24,
+                20,
                 0xFFFFFFFF
         );
 
-        int pickerX = getPickerX();
-        int pickerY = getPickerY();
-        int hueX = getHueX();
-        int hueY = pickerY;
+        drawPicker(graphics);
+        drawHueBar(graphics);
 
-        ensureColorCaches();
+        if (showAlpha) {
+            drawAlphaBar(graphics);
+        }
 
-        drawSaturationValuePicker(graphics, pickerX, pickerY);
-        drawHueSlider(graphics, hueX, hueY);
-        drawSelectionMarkers(graphics, pickerX, pickerY, hueX, hueY);
-        drawPreview(graphics, pickerX, pickerY + PICKER_HEIGHT + 12);
+        drawSelectedRow(graphics);
 
         super.render(graphics, mouseX, mouseY, delta);
     }
 
-    private void ensureColorCaches() {
-        buildHueColorsIfNeeded();
+    private void drawPicker(GuiGraphics graphics) {
+        for (int x = 0; x < PICKER_WIDTH; x += PICKER_CELL_SIZE) {
+            float s = x / (float) (PICKER_WIDTH - 1);
+            int cellRight = Math.min(pickerX + x + PICKER_CELL_SIZE, pickerX + PICKER_WIDTH);
 
-        int hueStep = Math.round(hue * 360.0f);
+            for (int y = 0; y < PICKER_HEIGHT; y += PICKER_CELL_SIZE) {
+                float b = 1.0f - y / (float) (PICKER_HEIGHT - 1);
+                int rgb = Color.HSBtoRGB(hue, s, b) | 0xFF000000;
+                int cellBottom = Math.min(pickerY + y + PICKER_CELL_SIZE, pickerY + PICKER_HEIGHT);
 
-        if (hueStep != cachedHueStep) {
-            cachedHueStep = hueStep;
-            buildPickerColors();
-        }
-    }
-
-    private void buildPickerColors() {
-        for (int column = 0; column < PICKER_COLUMNS; column++) {
-            int px = column * PICKER_CELL_SIZE;
-            float s = px / (float) (PICKER_WIDTH - 1);
-
-            for (int row = 0; row < PICKER_ROWS; row++) {
-                int py = row * PICKER_CELL_SIZE;
-                float v = 1.0f - py / (float) (PICKER_HEIGHT - 1);
-
-                pickerColors[column][row] = 0xFF000000 | hsvToRgb(hue, s, v);
-            }
-        }
-    }
-
-    private void buildHueColorsIfNeeded() {
-        if (hueColorsBuilt) {
-            return;
-        }
-
-        hueColorsBuilt = true;
-
-        for (int row = 0; row < HUE_ROWS; row++) {
-            int py = row * HUE_CELL_HEIGHT;
-            float h = py / (float) (PICKER_HEIGHT - 1);
-
-            hueColors[row] = 0xFF000000 | hsvToRgb(h, 1.0f, 1.0f);
-        }
-    }
-
-    private void drawSaturationValuePicker(GuiGraphics graphics, int x, int y) {
-        for (int column = 0; column < PICKER_COLUMNS; column++) {
-            int px = column * PICKER_CELL_SIZE;
-
-            for (int row = 0; row < PICKER_ROWS; row++) {
-                int py = row * PICKER_CELL_SIZE;
-
-                int cellRight = Math.min(x + px + PICKER_CELL_SIZE, x + PICKER_WIDTH);
-                int cellBottom = Math.min(y + py + PICKER_CELL_SIZE, y + PICKER_HEIGHT);
-
-                graphics.fill(x + px, y + py, cellRight, cellBottom, pickerColors[column][row]);
+                graphics.fill(
+                        pickerX + x,
+                        pickerY + y,
+                        cellRight,
+                        cellBottom,
+                        rgb
+                );
             }
         }
 
-        graphics.renderOutline(x, y, PICKER_WIDTH, PICKER_HEIGHT, 0xFFFFFFFF);
+        graphics.renderOutline(pickerX, pickerY, PICKER_WIDTH, PICKER_HEIGHT, 0xFFFFFFFF);
+
+        int markerX = pickerX + Math.round(saturation * (PICKER_WIDTH - 1));
+        int markerY = pickerY + Math.round((1.0f - brightness) * (PICKER_HEIGHT - 1));
+
+        graphics.renderOutline(markerX - 3, markerY - 3, 7, 7, 0xFFFFFFFF);
+        graphics.renderOutline(markerX - 2, markerY - 2, 5, 5, 0xFF000000);
     }
 
-    private void drawHueSlider(GuiGraphics graphics, int x, int y) {
-        for (int row = 0; row < HUE_ROWS; row++) {
-            int py = row * HUE_CELL_HEIGHT;
-            int cellBottom = Math.min(y + py + HUE_CELL_HEIGHT, y + PICKER_HEIGHT);
+    private void drawHueBar(GuiGraphics graphics) {
+        for (int y = 0; y < HUE_HEIGHT; y += HUE_CELL_HEIGHT) {
+            float h = y / (float) (HUE_HEIGHT - 1);
+            int rgb = Color.HSBtoRGB(h, 1.0f, 1.0f) | 0xFF000000;
+            int cellBottom = Math.min(hueY + y + HUE_CELL_HEIGHT, hueY + HUE_HEIGHT);
 
-            graphics.fill(x, y + py, x + HUE_WIDTH, cellBottom, hueColors[row]);
+            graphics.fill(
+                    hueX,
+                    hueY + y,
+                    hueX + HUE_WIDTH,
+                    cellBottom,
+                    rgb
+            );
         }
 
-        graphics.renderOutline(x, y, HUE_WIDTH, PICKER_HEIGHT, 0xFFFFFFFF);
+        graphics.renderOutline(hueX, hueY, HUE_WIDTH, HUE_HEIGHT, 0xFFFFFFFF);
+
+        int markerY = hueY + Math.round(hue * (HUE_HEIGHT - 1));
+        graphics.renderOutline(hueX - 2, markerY - 2, HUE_WIDTH + 4, 5, 0xFFFFFFFF);
+        graphics.renderOutline(hueX - 1, markerY - 1, HUE_WIDTH + 2, 3, 0xFF000000);
     }
 
-    private void drawSelectionMarkers(GuiGraphics graphics, int pickerX, int pickerY, int hueX, int hueY) {
-        int selectedX = pickerX + Math.round(saturation * (PICKER_WIDTH - 1));
-        int selectedY = pickerY + Math.round((1.0f - value) * (PICKER_HEIGHT - 1));
+    private void drawAlphaBar(GuiGraphics graphics) {
+        drawCheckerboard(graphics, alphaX, alphaY, ALPHA_WIDTH, ALPHA_HEIGHT);
 
-        graphics.renderOutline(selectedX - 3, selectedY - 3, 7, 7, 0xFF000000);
-        graphics.renderOutline(selectedX - 2, selectedY - 2, 5, 5, 0xFFFFFFFF);
+        for (int x = 0; x < ALPHA_WIDTH; x += ALPHA_CELL_WIDTH) {
+            float alphaFraction = x / (float) (ALPHA_WIDTH - 1);
+            int alpha = Math.round(alphaFraction * 255.0f);
+            int transparentColor = blendOverCheckerAverage(currentRgb, alpha);
 
-        int hueMarkerY = hueY + Math.round(hue * (PICKER_HEIGHT - 1));
+            int cellRight = Math.min(alphaX + x + ALPHA_CELL_WIDTH, alphaX + ALPHA_WIDTH);
 
-        graphics.fill(hueX - 2, hueMarkerY - 1, hueX + HUE_WIDTH + 2, hueMarkerY + 2, 0xFFFFFFFF);
-        graphics.fill(hueX - 1, hueMarkerY, hueX + HUE_WIDTH + 1, hueMarkerY + 1, 0xFF000000);
+            graphics.fill(
+                    alphaX + x,
+                    alphaY,
+                    cellRight,
+                    alphaY + ALPHA_HEIGHT,
+                    0xFF000000 | transparentColor
+            );
+        }
+
+        graphics.renderOutline(alphaX, alphaY, ALPHA_WIDTH, ALPHA_HEIGHT, 0xFFFFFFFF);
+
+        int markerX = alphaX + Math.round((alphaPercent / 100.0f) * (ALPHA_WIDTH - 1));
+        graphics.renderOutline(markerX - 2, alphaY - 2, 5, ALPHA_HEIGHT + 4, 0xFFFFFFFF);
+        graphics.renderOutline(markerX - 1, alphaY - 1, 3, ALPHA_HEIGHT + 2, 0xFF000000);
     }
 
-    private void drawPreview(GuiGraphics graphics, int x, int y) {
+    private void drawSelectedRow(GuiGraphics graphics) {
+        Component selectedLabel = Component.translatable("label.pvp-overlay.color_picker.selected");
+
+        int labelX = hexBox.getX() - 6 - this.font.width(selectedLabel);
+
         graphics.drawString(
                 this.font,
-                Component.translatable("label.pvp-overlay.color_picker.selected"),
-                x,
-                y + 5,
-                0xFFFFFFFF,
+                selectedLabel,
+                labelX,
+                selectedRowY + 6,
+                0xFFAAAAAA,
                 false
         );
 
-        graphics.fill(x + 80, y, x + 120, y + 20, 0xFF000000 | currentRgb);
-        graphics.renderOutline(x + 80, y, 40, 20, 0xFFFFFFFF);
+        drawPreview(graphics);
     }
 
-    private void updateSaturationValue(double mouseX, double mouseY) {
-        int pickerX = getPickerX();
-        int pickerY = getPickerY();
+    private void drawPreview(GuiGraphics graphics) {
+        graphics.fill(
+                previewX,
+                previewY,
+                previewX + PREVIEW_WIDTH,
+                previewY + PREVIEW_HEIGHT,
+                getCurrentArgb()
+        );
 
-        float newSaturation = clamp01((float) ((mouseX - pickerX) / (PICKER_WIDTH - 1)));
-        float newValue = clamp01(1.0f - (float) ((mouseY - pickerY) / (PICKER_HEIGHT - 1)));
+        graphics.renderOutline(previewX, previewY, PREVIEW_WIDTH, PREVIEW_HEIGHT, 0xFFFFFFFF);
+    }
 
-        if (newSaturation != saturation || newValue != value) {
-            saturation = newSaturation;
-            value = newValue;
-            updateCurrentColorCache();
-            updateHexInputFromCurrentColor();
-            colorDirty = true;
+    private void drawCheckerboard(GuiGraphics graphics, int x, int y, int width, int height) {
+        for (int cellX = 0; cellX < width; cellX += CHECKER_SIZE) {
+            for (int cellY = 0; cellY < height; cellY += CHECKER_SIZE) {
+                boolean light = ((cellX / CHECKER_SIZE) + (cellY / CHECKER_SIZE)) % 2 == 0;
+                int color = light ? 0xFFE0E0E0 : 0xFF8A8A8A;
+
+                graphics.fill(
+                        x + cellX,
+                        y + cellY,
+                        Math.min(x + cellX + CHECKER_SIZE, x + width),
+                        Math.min(y + cellY + CHECKER_SIZE, y + height),
+                        color
+                );
+            }
         }
+    }
+
+    private int blendOverCheckerAverage(int rgb, int alpha) {
+        int checkerRgb = 0xB5B5B5;
+
+        int r = blendChannel((rgb >> 16) & 0xFF, (checkerRgb >> 16) & 0xFF, alpha);
+        int g = blendChannel((rgb >> 8) & 0xFF, (checkerRgb >> 8) & 0xFF, alpha);
+        int b = blendChannel(rgb & 0xFF, checkerRgb & 0xFF, alpha);
+
+        return (r << 16) | (g << 8) | b;
+    }
+
+    private int blendChannel(int foreground, int background, int alpha) {
+        return Math.round((foreground * alpha + background * (255 - alpha)) / 255.0f);
+    }
+
+    private int alphaFromPercent(int percent) {
+        return Math.round(PvPOverlayConfig.clampInt(percent, 0, 100) * 255.0f / 100.0f);
+    }
+
+    private int getCurrentArgb() {
+        return (alphaFromPercent(alphaPercent) << 24) | currentRgb;
+    }
+
+    private void updatePicker(double mouseX, double mouseY) {
+        saturation = clampFloat((float) ((mouseX - pickerX) / (PICKER_WIDTH - 1)), 0.0f, 1.0f);
+        brightness = 1.0f - clampFloat((float) ((mouseY - pickerY) / (PICKER_HEIGHT - 1)), 0.0f, 1.0f);
+
+        updateCurrentColor(true);
     }
 
     private void updateHue(double mouseY) {
-        int hueY = getPickerY();
+        hue = clampFloat((float) ((mouseY - hueY) / (HUE_HEIGHT - 1)), 0.0f, 1.0f);
 
-        float newHue = clamp01((float) ((mouseY - hueY) / (PICKER_HEIGHT - 1)));
+        updateCurrentColor(true);
+    }
 
-        if (newHue != hue) {
-            hue = newHue;
-            updateCurrentColorCache();
-            updateHexInputFromCurrentColor();
+    private void updateAlpha(double mouseX) {
+        alphaPercent = Math.round(clampFloat((float) ((mouseX - alphaX) / (ALPHA_WIDTH - 1)), 0.0f, 1.0f) * 100.0f);
+        colorDirty = true;
+    }
+
+    private void updateCurrentColor(boolean markDirty) {
+        currentRgb = Color.HSBtoRGB(hue, saturation, brightness) & 0x00FFFFFF;
+        currentHex = String.format(Locale.US, "#%06X", currentRgb);
+
+        if (hexBox != null && !hexBox.getValue().equals(currentHex)) {
+            hexBox.setValue(currentHex);
+        }
+
+        if (markDirty) {
             colorDirty = true;
         }
     }
 
-    private void updateCurrentColorCache() {
-        currentRgb = hsvToRgb(hue, saturation, value);
-        currentHex = String.format("#%06X", currentRgb);
-    }
+    private void setColorFromHex(String value, boolean markDirty) {
+        String normalized = PvPOverlayConfig.normalizeColorHex(value, "#FFFFFF");
+        String raw = normalized.substring(1);
 
-    private void updateHexInputFromCurrentColor() {
-        if (hexInput == null) {
-            return;
+        currentRgb = Integer.parseInt(raw, 16);
+        currentHex = normalized;
+
+        float[] hsb = Color.RGBtoHSB(
+                (currentRgb >> 16) & 0xFF,
+                (currentRgb >> 8) & 0xFF,
+                currentRgb & 0xFF,
+                null
+        );
+
+        hue = hsb[0];
+        saturation = hsb[1];
+        brightness = hsb[2];
+
+        if (hexBox != null && !hexBox.getValue().equals(currentHex)) {
+            hexBox.setValue(currentHex);
         }
 
-        updatingHexInput = true;
-        hexInput.setValue(currentHex);
-        updatingHexInput = false;
+        if (markDirty) {
+            colorDirty = true;
+        }
     }
 
-    private void commitColorIfDirty() {
+    private void applyIfDirty() {
         if (!colorDirty) {
             return;
         }
 
+        if (showAlpha && colorAlphaSetter != null) {
+            colorAlphaSetter.set(currentHex, alphaPercent);
+        } else if (colorSetter != null) {
+            colorSetter.set(currentHex);
+        }
+
         colorDirty = false;
-        setter.set(currentHex);
     }
 
-    private void setFromHex(String hex) {
-        if (!PvPOverlayConfig.isValidColorHex(hex)) {
-            return;
-        }
-
-        String normalized = hex.trim();
-
-        if (normalized.startsWith("#")) {
-            normalized = normalized.substring(1);
-        }
-
-        int rgb = Integer.parseInt(normalized, 16);
-
-        float r = ((rgb >> 16) & 0xFF) / 255.0f;
-        float g = ((rgb >> 8) & 0xFF) / 255.0f;
-        float b = (rgb & 0xFF) / 255.0f;
-
-        float max = Math.max(r, Math.max(g, b));
-        float min = Math.min(r, Math.min(g, b));
-        float delta = max - min;
-
-        value = max;
-        saturation = max == 0.0f ? 0.0f : delta / max;
-
-        if (delta == 0.0f) {
-            hue = 0.0f;
-        } else if (max == r) {
-            hue = ((g - b) / delta) / 6.0f;
-
-            if (hue < 0.0f) {
-                hue += 1.0f;
-            }
-        } else if (max == g) {
-            hue = (((b - r) / delta) + 2.0f) / 6.0f;
-        } else {
-            hue = (((r - g) / delta) + 4.0f) / 6.0f;
-        }
-    }
-
-    private static int hsvToRgb(float h, float s, float v) {
-        h = clamp01(h);
-        s = clamp01(s);
-        v = clamp01(v);
-
-        float scaledHue = h * 6.0f;
-        int sector = (int) Math.floor(scaledHue);
-        float fraction = scaledHue - sector;
-
-        float p = v * (1.0f - s);
-        float q = v * (1.0f - fraction * s);
-        float t = v * (1.0f - (1.0f - fraction) * s);
-
-        float r;
-        float g;
-        float b;
-
-        switch (sector % 6) {
-            case 0 -> {
-                r = v;
-                g = t;
-                b = p;
-            }
-            case 1 -> {
-                r = q;
-                g = v;
-                b = p;
-            }
-            case 2 -> {
-                r = p;
-                g = v;
-                b = t;
-            }
-            case 3 -> {
-                r = p;
-                g = q;
-                b = v;
-            }
-            case 4 -> {
-                r = t;
-                g = p;
-                b = v;
-            }
-            default -> {
-                r = v;
-                g = p;
-                b = q;
-            }
-        }
-
-        int red = Math.round(r * 255.0f);
-        int green = Math.round(g * 255.0f);
-        int blue = Math.round(b * 255.0f);
-
-        return (red << 16) | (green << 8) | blue;
-    }
-
-    private int getPickerX() {
-        return this.width / 2 - (PICKER_WIDTH + GAP + HUE_WIDTH) / 2;
-    }
-
-    private int getPickerY() {
-        return 58;
-    }
-
-    private int getHueX() {
-        return getPickerX() + PICKER_WIDTH + GAP;
-    }
-
-    private static boolean isInside(double mouseX, double mouseY, int x, int y, int width, int height) {
+    private boolean isInside(double mouseX, double mouseY, int x, int y, int width, int height) {
         return mouseX >= x &&
                 mouseX <= x + width &&
                 mouseY >= y &&
                 mouseY <= y + height;
     }
 
-    private static float clamp01(float value) {
-        return Math.max(0.0f, Math.min(1.0f, value));
+    private float clampFloat(float value, float min, float max) {
+        return Math.max(min, Math.min(max, value));
     }
 
     public interface ColorSetter {
         void set(String value);
+    }
+
+    public interface ColorAlphaSetter {
+        void set(String value, int alphaPercent);
     }
 }
